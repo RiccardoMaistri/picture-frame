@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/MateEke/picture-frame/internal/library"
@@ -30,6 +31,7 @@ type APIConfig struct {
 // albumState is one album's cached enumeration with its ETag gate.
 type albumState struct {
 	id     string
+	name   string // display name, from the same response as the ETag gate
 	assets []library.Asset
 	etag   string // album response ETag; gates re-enumeration
 	loaded bool   // an enumeration has succeeded at least once
@@ -90,18 +92,18 @@ func (c *APIClient) List(ctx context.Context) ([]library.Asset, error) {
 	buckets, reenumerated := 0, 0
 	for i := range c.albums {
 		a := &c.albums[i]
-		changed, etag, err := c.albumChanged(ctx, a)
+		changed, name, etag, err := c.albumChanged(ctx, a)
 		if err != nil {
 			return nil, err
 		}
 		if !changed {
 			continue
 		}
-		assets, n, err := c.enumerate(ctx, a.id)
+		assets, n, err := c.enumerate(ctx, a.id, name)
 		if err != nil {
 			return nil, err
 		}
-		a.assets, a.etag, a.loaded = assets, etag, true
+		a.assets, a.name, a.etag, a.loaded = assets, name, etag, true
 		buckets += n
 		reenumerated++
 	}
@@ -129,11 +131,13 @@ func mergeAssets(albums []albumState) []library.Asset {
 }
 
 // albumChanged conditional-GETs one album: a 304 reuses the cache, a 200 means
-// re-enumerate. The new ETag is committed only with a successful enumeration.
-func (c *APIClient) albumChanged(ctx context.Context, a *albumState) (changed bool, etag string, err error) {
+// re-enumerate. The 200 body also carries the album name, so the gate is also
+// where the name is learned. The new ETag is committed only with a successful
+// enumeration.
+func (c *APIClient) albumChanged(ctx context.Context, a *albumState) (changed bool, name, etag string, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/api/albums/"+a.id, nil)
 	if err != nil {
-		return false, "", err
+		return false, "", "", err
 	}
 	c.auth(req)
 	if a.loaded && a.etag != "" {
@@ -141,25 +145,44 @@ func (c *APIClient) albumChanged(ctx context.Context, a *albumState) (changed bo
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return false, "", fmt.Errorf("immich: album gate: %w", err)
+		return false, "", "", fmt.Errorf("immich: album gate: %w", err)
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusNotModified:
-		return false, "", nil
+		return false, a.name, "", nil
 	case http.StatusOK:
-		return true, resp.Header.Get("ETag"), nil
+		var album Album
+		if err := json.NewDecoder(resp.Body).Decode(&album); err != nil {
+			return false, "", "", fmt.Errorf("immich: decode album %s: %w", a.id, err)
+		}
+		return true, album.AlbumName, resp.Header.Get("ETag"), nil
 	default:
-		return false, "", &httpError{Status: resp.StatusCode}
+		return false, "", "", &httpError{Status: resp.StatusCode}
 	}
 }
 
 // enumerate lists one album's image assets via the timeline API, the same
-// listing the shared-link client uses, authenticated by API key.
-func (c *APIClient) enumerate(ctx context.Context, albumID string) ([]library.Asset, int, error) {
+// listing the shared-link client uses, authenticated by API key. Every asset
+// carries the album name and the year of the album's earliest photo (from the
+// first non-empty bucket) so the kiosk can label a slide without another lookup.
+func (c *APIClient) enumerate(ctx context.Context, albumID, albumName string) ([]library.Asset, int, error) {
 	var buckets []timelineBucketMeta
 	if err := c.getJSON(ctx, "/api/timeline/buckets", url.Values{"albumId": {albumID}}, &buckets); err != nil {
 		return nil, 0, fmt.Errorf("immich: list buckets: %w", err)
+	}
+	// Find the year of the earliest bucket that contains images.
+var year int
+	for _, b := range buckets {
+		if b.Count > 0 && len(b.TimeBucket) >= 4 && b.TimeBucket[0] >= '0' && b.TimeBucket[0] <= '9' {
+			var err error
+			year, err = strconv.Atoi(b.TimeBucket[:4])
+			if err == nil && year >= 1000 && year <= 9999 {
+				break
+			}
+		}
+	}
+		}
 	}
 	var out []library.Asset
 	for _, b := range buckets {
@@ -168,7 +191,7 @@ func (c *APIClient) enumerate(ctx context.Context, albumID string) ([]library.As
 		if err := c.getJSON(ctx, "/api/timeline/bucket", q, &bucket); err != nil {
 			return nil, 0, fmt.Errorf("immich: bucket %s: %w", b.TimeBucket, err)
 		}
-		out = appendImageAssets(out, bucket)
+		out = appendImageAssets(out, bucket, albumName, year)
 	}
 	return out, len(buckets), nil
 }
