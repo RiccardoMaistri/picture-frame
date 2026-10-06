@@ -17,6 +17,7 @@ import (
 
 	"github.com/MateEke/picture-frame/internal/library"
 	"github.com/MateEke/picture-frame/providers"
+	"strconv"
 )
 
 // httpError lets callers branch on HTTP status without parsing strings.
@@ -72,6 +73,7 @@ type Client struct {
 	log      *slog.Logger
 
 	albumID        string // cached after first List
+	albumName      string // display name, resolved alongside albumID
 	token          string // immich_shared_link_token cookie value; set by login
 	legacyPassword bool   // pre-2.6 server: send the password as a query parameter
 
@@ -221,11 +223,25 @@ func (c *Client) albumChanged(ctx context.Context, albumID string) (changed bool
 
 // enumerate lists the album's image assets via the timeline API (the only
 // key-authenticated listing after Immich v3 dropped AlbumResponseDto.assets) and
-// returns the number of buckets it fetched.
+// returns the number of buckets it fetched. Every asset carries the album name
+// and the year of the album's earliest photo (from the first non-empty bucket).
 func (c *Client) enumerate(ctx context.Context, albumID string) ([]library.Asset, int, error) {
 	var buckets []timelineBucketMeta
 	if err := c.getJSON(ctx, "/api/timeline/buckets", url.Values{"albumId": {albumID}}, &buckets); err != nil {
 		return nil, 0, fmt.Errorf("immich: list buckets: %w", err)
+	}
+	// Find the year of the earliest bucket that contains images. Immich's
+	// timeline buckets are ordered oldest-first, so the first bucket with
+	// Count > 0 gives the album's year.
+	var year int
+	for _, b := range buckets {
+		if b.Count > 0 && len(b.TimeBucket) >= 4 && b.TimeBucket[0] >= '0' && b.TimeBucket[0] <= '9' {
+			var err error
+			year, err = strconv.Atoi(b.TimeBucket[:4])
+			if err == nil && year >= 1000 && year <= 9999 {
+				break
+			}
+		}
 	}
 	var out []library.Asset
 	for _, b := range buckets {
@@ -234,13 +250,14 @@ func (c *Client) enumerate(ctx context.Context, albumID string) ([]library.Asset
 		if err := c.getJSON(ctx, "/api/timeline/bucket", q, &bucket); err != nil {
 			return nil, 0, fmt.Errorf("immich: bucket %s: %w", b.TimeBucket, err)
 		}
-		out = appendImageAssets(out, bucket)
+		out = appendImageAssets(out, bucket, c.albumName, year)
 	}
 	return out, len(buckets), nil
 }
 
 type timelineBucketMeta struct {
 	TimeBucket string `json:"timeBucket"`
+	Count      int    `json:"count"`
 }
 
 // timelineBucket is the columnar (struct-of-arrays) shape Immich returns per bucket.
@@ -251,8 +268,9 @@ type timelineBucket struct {
 }
 
 // appendImageAssets maps the columnar payload to image assets, tolerating short
-// or absent optional arrays.
-func appendImageAssets(out []library.Asset, b timelineBucket) []library.Asset {
+// or absent optional arrays. Every asset carries the album name and the year of
+// the album's earliest photo so the kiosk can label a slide without a second lookup.
+func appendImageAssets(out []library.Asset, b timelineBucket, album string, year int) []library.Asset {
 	for i, id := range b.ID {
 		if id == "" {
 			continue
@@ -264,7 +282,7 @@ func appendImageAssets(out []library.Asset, b timelineBucket) []library.Asset {
 		if i < len(b.Thumbhash) {
 			th = b.Thumbhash[i]
 		}
-		out = append(out, library.Asset{ID: id, Version: thumbhashToken(th)})
+		out = append(out, library.Asset{ID: id, Version: thumbhashToken(th), Album: album, Year: year})
 	}
 	return out
 }
@@ -285,7 +303,8 @@ func (c *Client) resolveAlbumID(ctx context.Context) (string, error) {
 	}
 	var share struct {
 		Album struct {
-			ID string `json:"id"`
+			ID   string `json:"id"`
+			Name string `json:"albumName"`
 		} `json:"album"`
 	}
 	if err := c.getJSON(ctx, "/api/shared-links/me", nil, &share); err != nil {
@@ -295,6 +314,7 @@ func (c *Client) resolveAlbumID(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("immich: share is not an album")
 	}
 	c.albumID = share.Album.ID
+	c.albumName = share.Album.Name
 	return c.albumID, nil
 }
 
