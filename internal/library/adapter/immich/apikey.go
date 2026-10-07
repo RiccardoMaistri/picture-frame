@@ -172,7 +172,7 @@ func (c *APIClient) enumerate(ctx context.Context, albumID, albumName string) ([
 		return nil, 0, fmt.Errorf("immich: list buckets: %w", err)
 	}
 	// Find the year of the earliest bucket that contains images.
-var year int
+	var year int
 	for _, b := range buckets {
 		if b.Count > 0 && len(b.TimeBucket) >= 4 && b.TimeBucket[0] >= '0' && b.TimeBucket[0] <= '9' {
 			var err error
@@ -180,8 +180,6 @@ var year int
 			if err == nil && year >= 1000 && year <= 9999 {
 				break
 			}
-		}
-	}
 		}
 	}
 	var out []library.Asset

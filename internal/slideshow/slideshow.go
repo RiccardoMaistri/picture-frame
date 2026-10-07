@@ -3,6 +3,7 @@ package slideshow
 import (
 	"context"
 	"log/slog"
+	"math"
 	"slices"
 	"sync"
 	"time"
@@ -186,11 +187,33 @@ func (s *Slideshow) allPresent(slide *slideplan.Slide) bool {
 }
 
 func (s *Slideshow) publish(slide *slideplan.Slide) {
+	year := s.slideYear(slide)
 	s.bus.Publish(state.Event{
 		Kind:    state.KindImage,
-		Payload: state.ImagePayload{Names: slide.Names, Next: s.preloadHint(slide)},
+		Payload: state.ImagePayload{Names: slide.Names, Album: slide.Album, Year: year, Next: s.preloadHint(slide)},
 	})
-	s.log.Debug("slideshow: displaying slide", "names", slide.Names)
+	s.log.Debug("slideshow: displaying slide", "names", slide.Names, "album", slide.Album, "year", year)
+}
+
+func (s *Slideshow) slideYear(slide *slideplan.Slide) int {
+	if s.lib == nil || len(slide.Names) == 0 {
+		return 0
+	}
+	minYear := math.MaxInt
+	for _, name := range slide.Names {
+		for _, img := range s.lib.Cycle() {
+			if img.Name == name {
+				if img.Year > 0 && img.Year < minYear {
+					minYear = img.Year
+				}
+				break
+			}
+		}
+	}
+	if minYear == math.MaxInt {
+		return 0
+	}
+	return minYear
 }
 
 // preloadHint peeks at the slide after the published one so the kiosk can
