@@ -294,7 +294,7 @@ func TestSyncDeletesRemovedAssets(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(root.Name(), n), []byte("seed"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		lib.Add(n)
+		lib.Add(n, "", 0)
 	}
 	r := &fakeRemote{}
 	r.set(asset(idA, 1))
@@ -316,7 +316,7 @@ func TestSyncReplacesEditedAsset(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root.Name(), old), []byte("old"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	lib.Add(old)
+	lib.Add(old, "", 0)
 	r := &fakeRemote{}
 	r.set(asset(idA, 2))
 	s := library.NewSyncer(testutil.NopLogger(), r, lib, root, time.Hour, &fakeAdvancer{})
@@ -340,7 +340,7 @@ func TestSyncKeepsCacheOnListError(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root.Name(), name), []byte("seed"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	lib.Add(name)
+	lib.Add(name, "", 0)
 	r := &fakeRemote{listErr: errors.New("network down")}
 	s := library.NewSyncer(testutil.NopLogger(), r, lib, root, time.Hour, &fakeAdvancer{})
 	runOnce(t, s)
@@ -444,7 +444,7 @@ func TestSyncDoesNotAdvanceWhenLibraryWasNonEmpty(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root.Name(), seed), []byte("seed"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	lib.Add(seed)
+	lib.Add(seed, "", 0)
 	r := &fakeRemote{}
 	r.set(asset(idA, 1), asset(idB, 2))
 	adv := &fakeAdvancer{}

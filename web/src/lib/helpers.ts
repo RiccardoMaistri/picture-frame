@@ -114,17 +114,3 @@ export function isSensorStale(
 	if (!timestamp) return true;
 	return now - new Date(timestamp).getTime() > maxAgeMs;
 }
-
-/**
- * Outside temperature for the kiosk overlay: a fresh role="outside" sensor wins,
- * else OWM, else placeholder. (Icon stays OWM-only, local stations rarely map to it.)
- */
-export function resolveOutsideTemp(
-	sensors: Record<string, SensorPayload>,
-	weather: WeatherPayload | null | undefined
-): string {
-	const s = sensors['outside:temperature'];
-	if (s && !isSensorStale(s.timestamp)) return s.value.toFixed(1);
-	const t = weather?.temp;
-	return t !== undefined ? t.toFixed(1) : '--';
-}

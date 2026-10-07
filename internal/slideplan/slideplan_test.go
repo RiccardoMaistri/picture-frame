@@ -40,6 +40,14 @@ func equal(a, b [][]string) bool {
 	return true
 }
 
+func photos(names ...string) []slideplan.Photo {
+	out := make([]slideplan.Photo, len(names))
+	for i, n := range names {
+		out[i] = slideplan.Photo{Name: n}
+	}
+	return out
+}
+
 func TestPlan(t *testing.T) {
 	// On a 16:9 screen with Factor 1.5: tall outlier if ratio <= 1.185,
 	// wide outlier if ratio >= 2.667, else Fit.
@@ -74,7 +82,7 @@ func TestPlan(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := names(slideplan.Plan(tc.order, tc.screen, r, thr, tc.enabled))
+			got := names(slideplan.Plan(photos(tc.order...), tc.screen, r, thr, tc.enabled))
 			if !equal(got, tc.want) {
 				t.Errorf("Plan(%v) = %v, want %v", tc.order, got, tc.want)
 			}

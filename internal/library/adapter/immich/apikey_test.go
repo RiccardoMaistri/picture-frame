@@ -39,6 +39,7 @@ type fakeAPIImmich struct {
 	// unknown album IDs 404. etags maps album ID → ETag ("" disables the gate).
 	albums map[string][]fakeAsset
 	etags  map[string]string
+	names  map[string]string // album ID → display name
 }
 
 func newFakeAPIImmich() *fakeAPIImmich {
@@ -78,7 +79,7 @@ func (f *fakeAPIImmich) handler() http.Handler {
 				http.NotFound(w, r)
 				return
 			}
-			serveGate(w, r, f.albumETag(id))
+			serveGate(w, r, f.albumETag(id), f.albumName(id))
 			return
 		}
 		albumID := r.URL.Query().Get("albumId")
@@ -141,6 +142,17 @@ func (f *fakeAPIImmich) albumAssets(id string) ([]fakeAsset, bool) {
 		return nil, false
 	}
 	return append([]fakeAsset(nil), f.assets...), true
+}
+
+// albumName is the display name the fake reports for an album, so the test can
+// tell which configured album an asset came from.
+func (f *fakeAPIImmich) albumName(id string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if name, ok := f.names[id]; ok {
+		return name
+	}
+	return "Album " + id
 }
 
 func (f *fakeAPIImmich) albumETag(id string) string {
@@ -391,6 +403,7 @@ func TestAPIClientMergesMultipleAlbums(t *testing.T) {
 		testAPIAlbum:  {{id: assetA, isImage: true, thumbhash: "ha"}, shared},
 		testAPIAlbumB: {shared, {id: assetB, isImage: true, thumbhash: "hb"}},
 	}
+	fake.names = map[string]string{testAPIAlbum: "Trip", testAPIAlbumB: "Wedding"}
 	srv := httptest.NewServer(fake.handler())
 	defer srv.Close()
 	c := newAPIClientFor(t, srv, testAPIAlbum, testAPIAlbumB)
@@ -406,6 +419,14 @@ func TestAPIClientMergesMultipleAlbums(t *testing.T) {
 	for i, id := range want {
 		if got[i].ID != id {
 			t.Errorf("asset[%d] = %s, want %s (full: %v)", i, got[i].ID, id, got)
+		}
+	}
+// Each asset is labelled with its own album, so the kiosk can group a pair.
+// A shared photo keeps the first album that claimed it.
+	wantAlbums := []string{"Trip", "Trip", "Wedding"}
+	for i, album := range wantAlbums {
+		if got[i].Album != album {
+			t.Errorf("asset[%d] album = %q, want %q", i, got[i].Album, album)
 		}
 	}
 }

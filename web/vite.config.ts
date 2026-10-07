@@ -1,14 +1,9 @@
-import { fileURLToPath } from 'node:url';
 import { heyApiPlugin } from '@hey-api/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
 import sbom from 'rollup-plugin-sbom';
-import { meteocons, themeColor } from './src/lib/build/meteocons.ts';
-
-// anchored to this file, not the cwd, so invoking vite from elsewhere still works
-const kioskCss = fileURLToPath(new URL('./src/routes/kiosk/layout.css', import.meta.url));
 
 // When BACKEND_URL is set, proxy API and SSE requests to a remote backend
 // instead of localhost:8080. Useful for developing against the Pi directly:
@@ -45,7 +40,6 @@ export default defineConfig({
 	plugins: [
 		...apiPlugins,
 		tailwindcss(),
-		meteocons(themeColor(kioskCss, '--color-kiosk-fg')),
 		sveltekit(),
 		// Bundle-truth CycloneDX SBOM, only what survives tree-shaking (cf. build.license).
 		sbom()

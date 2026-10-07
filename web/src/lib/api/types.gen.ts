@@ -210,8 +210,10 @@ export type ImageItem = {
 };
 
 export type ImagePayload = {
+    album?: string;
     names: Array<string> | null;
     next?: Array<string> | null;
+    year?: number;
 };
 
 export type ImmichApiKeyDto = {

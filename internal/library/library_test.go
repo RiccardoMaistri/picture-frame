@@ -92,7 +92,7 @@ func TestList(t *testing.T) {
 
 func TestAdd(t *testing.T) {
 	l := library.New(nil, false)
-	l.Add("a.jpg")
+	l.Add("a.jpg", "", 0)
 	if l.Len() != 1 {
 		t.Fatalf("expected 1, got %d", l.Len())
 	}
@@ -271,7 +271,7 @@ func TestReshuffleEmpty(t *testing.T) {
 
 func TestListIsCanonicalAndStableAcrossReshuffle(t *testing.T) {
 	rng := rand.New(rand.NewPCG(1, 2))
-	imgs := []library.Image{{"a.jpg"}, {"b.jpg"}, {"c.jpg"}, {"d.jpg"}}
+	imgs := []library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}, {Name: "c.jpg"}, {Name: "d.jpg"}}
 	l := library.New(imgs, true, library.WithTestRNG(rng))
 	before := l.List()
 	l.Reshuffle()
@@ -286,7 +286,7 @@ func TestListIsCanonicalAndStableAcrossReshuffle(t *testing.T) {
 
 func TestCycleShuffledWhenRandomized(t *testing.T) {
 	rng := rand.New(rand.NewPCG(1, 2))
-	imgs := []library.Image{{"a.jpg"}, {"b.jpg"}, {"c.jpg"}, {"d.jpg"}}
+	imgs := []library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}, {Name: "c.jpg"}, {Name: "d.jpg"}}
 	l := library.New(imgs, true, library.WithTestRNG(rng))
 	if slices.Equal(imgNames(l.Cycle()), imgNames(l.List())) {
 		t.Fatalf("expected shuffled cycle to differ from canonical")
@@ -294,7 +294,7 @@ func TestCycleShuffledWhenRandomized(t *testing.T) {
 }
 
 func TestSetOrderReconciles(t *testing.T) {
-	l := library.New([]library.Image{{"a.jpg"}, {"b.jpg"}, {"c.jpg"}}, false)
+	l := library.New([]library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}, {Name: "c.jpg"}}, false)
 	// Unknown "z.jpg" ignored; "c.jpg" omitted so it appends at the end.
 	got := l.SetOrder([]string{"b.jpg", "z.jpg", "a.jpg"})
 	want := []string{"b.jpg", "a.jpg", "c.jpg"}
@@ -308,7 +308,7 @@ func TestSetOrderReconciles(t *testing.T) {
 
 func TestSetOrderMovesKnownAheadOfUnknown(t *testing.T) {
 	// Unknown "x.jpg" sits first, so the known images must sort ahead of it.
-	l := library.New([]library.Image{{"x.jpg"}, {"a.jpg"}, {"b.jpg"}}, false)
+	l := library.New([]library.Image{{Name: "x.jpg"}, {Name: "a.jpg"}, {Name: "b.jpg"}}, false)
 	got := l.SetOrder([]string{"b.jpg", "a.jpg"})
 	want := []string{"b.jpg", "a.jpg", "x.jpg"}
 	if !slices.Equal(got, want) {
@@ -317,7 +317,7 @@ func TestSetOrderMovesKnownAheadOfUnknown(t *testing.T) {
 }
 
 func TestSetOrderNilKeepsOrder(t *testing.T) {
-	l := library.New([]library.Image{{"a.jpg"}, {"b.jpg"}}, false)
+	l := library.New([]library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}}, false)
 	got := l.SetOrder(nil)
 	if !slices.Equal(got, []string{"a.jpg", "b.jpg"}) {
 		t.Fatalf("SetOrder(nil) %v", got)
@@ -325,8 +325,8 @@ func TestSetOrderNilKeepsOrder(t *testing.T) {
 }
 
 func TestAddAppendsToCanonicalAndCycle(t *testing.T) {
-	l := library.New([]library.Image{{"a.jpg"}}, false)
-	l.Add("b.jpg")
+	l := library.New([]library.Image{{Name: "a.jpg"}}, false)
+	l.Add("b.jpg", "", 0)
 	if !slices.Equal(imgNames(l.List()), []string{"a.jpg", "b.jpg"}) {
 		t.Fatalf("canonical %v", l.List())
 	}
@@ -336,7 +336,7 @@ func TestAddAppendsToCanonicalAndCycle(t *testing.T) {
 }
 
 func TestRemoveDropsFromBoth(t *testing.T) {
-	l := library.New([]library.Image{{"a.jpg"}, {"b.jpg"}}, false)
+	l := library.New([]library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}}, false)
 	if !l.Remove("a.jpg") {
 		t.Fatal("Remove returned false")
 	}
@@ -351,7 +351,7 @@ func TestRemoveDropsFromBoth(t *testing.T) {
 func TestReshuffleAvoidsImmediateRepeat(t *testing.T) {
 	// Seed chosen so a naive shuffle would repeat the last element first.
 	rng := rand.New(rand.NewPCG(42, 42))
-	l := library.New([]library.Image{{"a.jpg"}, {"b.jpg"}, {"c.jpg"}}, true, library.WithTestRNG(rng))
+	l := library.New([]library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}, {Name: "c.jpg"}}, true, library.WithTestRNG(rng))
 	prev := l.Cycle()
 	next := l.Reshuffle()
 	if next[0].Name == prev[len(prev)-1].Name {

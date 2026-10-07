@@ -213,6 +213,7 @@ func (s *Syncer) syncOnce(ctx context.Context) bool {
 		return false
 	}
 	s.cleanTmp()
+	s.lib.SetAlbums(albumsOf(remote))
 
 	// Drop manifest entries whose file vanished (manual deletes, crashed
 	// removals) so they re-download instead of looking cached.
@@ -410,7 +411,7 @@ func (s *Syncer) download(ctx context.Context, a Asset) (int64, error) {
 		_ = s.root.Remove(tmp)
 		return 0, err
 	}
-	s.lib.Add(name)
+	s.lib.Add(name, string(a.Album), a.Year)
 	s.manifest.Set(name, ManifestEntry{ID: a.ID, Version: a.Version, Bytes: n})
 	if s.aspect != nil {
 		// Decode the preview, not remote EXIF: the preview has orientation baked in,
@@ -458,6 +459,21 @@ func (s *Syncer) writeAtomic(ctx context.Context, id, tmp, final string) (int64,
 // safeErrorMessage redacts filesystem paths and caps length so server-side error
 // strings stay UI-safe and bounded.
 func safeErrorMessage(s string) string { return redact.Path(s) }
+
+// albumsOf maps each remote asset's local filename to its album. Assets with no
+// album (a provider that reports none) are left out so the library keeps what it
+// has rather than blanking known details, and an unversioned asset is skipped
+// because its filename is not derivable yet.
+func albumsOf(remote []Asset) map[string]string {
+	out := make(map[string]string, len(remote))
+	for _, a := range remote {
+		if a.Album == "" || a.Version == "" {
+			continue
+		}
+		out[SyncedFilename(a)] = string(a.Album)
+	}
+	return out
+}
 
 // SyncedFilename returns the canonical local name for an asset. Panics on an
 // empty Version, which would produce an unparseable name and loop in the diff.

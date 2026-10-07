@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { ImagePayload } from '$lib/api/types.gen';
-	import { ImageOffIcon, ShuffleIcon, ArrowRightIcon } from '@lucide/svelte';
+	import { dev } from '$app/environment';
+	import { ImageOffIcon, ShuffleIcon, ArrowRightIcon, MaximizeIcon } from '@lucide/svelte';
 	import { formatDuration } from '$lib/duration';
+	import { openKioskFullscreen } from '$lib/kioskMode';
 	import Slide from '$lib/Slide.svelte';
 	import { fade } from 'svelte/transition';
 	import { sineInOut } from 'svelte/easing';
@@ -26,7 +28,21 @@
 </script>
 
 <div class="card bg-surface-100-900 reveal space-y-3 p-4">
-	<h2 class="h4">Now playing</h2>
+	<div class="flex items-center justify-between gap-2">
+		<h2 class="h4">Now playing</h2>
+		<!-- Dev only: lets a local browser show the kiosk the way the panel does. -->
+		{#if dev}
+			<button
+				class="btn btn-sm preset-tonal-surface flex items-center gap-1.5"
+				title="Open the kiosk full screen"
+				onclick={openKioskFullscreen}
+				data-testid="now-playing-kiosk"
+			>
+				<MaximizeIcon class="size-4" />
+				Kiosk mode
+			</button>
+		{/if}
+	</div>
 	{#if names}
 		<div
 			class="bg-surface-200-800 relative mx-auto w-full overflow-hidden rounded-lg"

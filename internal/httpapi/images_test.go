@@ -220,8 +220,8 @@ func TestListImagesEmpty(t *testing.T) {
 
 func TestListImagesNonEmpty(t *testing.T) {
 	h := newImageServer(t)
-	h.lib.Add("a.jpg")
-	h.lib.Add("b.jpg")
+	h.lib.Add("a.jpg", "", 0)
+	h.lib.Add("b.jpg", "", 0)
 	rec := httptest.NewRecorder()
 	h.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/images", nil))
 	if rec.Code != http.StatusOK {
@@ -516,7 +516,7 @@ func TestDeleteHappyPath(t *testing.T) {
 func TestDeleteFileAlreadyGone(t *testing.T) {
 	h := newImageServer(t)
 	// Library entry present, no file on disk.
-	h.lib.Add("ghost.jpg")
+	h.lib.Add("ghost.jpg", "", 0)
 	rec := httptest.NewRecorder()
 	h.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/images/ghost.jpg", nil))
 	if rec.Code != http.StatusNoContent {
@@ -540,7 +540,7 @@ func TestDeleteFileRemoveError(t *testing.T) {
 		t.Fatalf("OpenFile child: %v", err)
 	}
 	_ = f.Close()
-	h.lib.Add("stuck.jpg")
+	h.lib.Add("stuck.jpg", "", 0)
 
 	rec := httptest.NewRecorder()
 	h.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/images/stuck.jpg", nil))
@@ -773,9 +773,9 @@ func newImageServerWithOrder(t *testing.T) *imageHarness {
 
 func TestSetImageOrderReordersAndReconciles(t *testing.T) {
 	h := newImageServerWithOrder(t)
-	h.lib.Add("a.jpg")
-	h.lib.Add("b.jpg")
-	h.lib.Add("c.jpg")
+	h.lib.Add("a.jpg", "", 0)
+	h.lib.Add("b.jpg", "", 0)
+	h.lib.Add("c.jpg", "", 0)
 
 	resp := h.put(t, "/api/images/order", `{"names":["c.jpg","z.jpg","a.jpg"]}`)
 	if resp.Code != http.StatusNoContent {
@@ -791,7 +791,7 @@ func TestSetImageOrderReordersAndReconciles(t *testing.T) {
 
 func TestSetImageOrderCommitRestartsWhenSequential(t *testing.T) {
 	h := newImageServerWithOrder(t)
-	h.lib.Add("a.jpg")
+	h.lib.Add("a.jpg", "", 0)
 	resp := h.put(t, "/api/images/order", `{"names":["a.jpg"],"commit":true}`)
 	if resp.Code != http.StatusNoContent {
 		t.Fatalf("status %d", resp.Code)
@@ -803,7 +803,7 @@ func TestSetImageOrderCommitRestartsWhenSequential(t *testing.T) {
 
 func TestSetImageOrderCommitSkippedWhenRandomized(t *testing.T) {
 	h := newImageServerWithOrder(t)
-	h.lib.Add("a.jpg")
+	h.lib.Add("a.jpg", "", 0)
 	h.lib.SetRandomize(true)
 	resp := h.put(t, "/api/images/order", `{"names":["a.jpg"],"commit":true}`)
 	if resp.Code != http.StatusNoContent {
@@ -816,7 +816,7 @@ func TestSetImageOrderCommitSkippedWhenRandomized(t *testing.T) {
 
 func TestSetImageOrderNoCommitDoesNotRestart(t *testing.T) {
 	h := newImageServerWithOrder(t)
-	h.lib.Add("a.jpg")
+	h.lib.Add("a.jpg", "", 0)
 	resp := h.put(t, "/api/images/order", `{"names":["a.jpg"]}`)
 	if resp.Code != http.StatusNoContent {
 		t.Fatalf("status %d", resp.Code)

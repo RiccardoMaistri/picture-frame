@@ -14,18 +14,18 @@ func NewLibrarySource(lib *library.Library) slideplan.Source {
 	return librarySource{lib: lib}
 }
 
-func (s librarySource) Order() []string {
-	return imageNames(s.lib.Cycle())
+func (s librarySource) Order() []slideplan.Photo {
+	return photos(s.lib.Cycle())
 }
 
-func (s librarySource) NextCycle() []string {
-	return imageNames(s.lib.Reshuffle())
+func (s librarySource) NextCycle() []slideplan.Photo {
+	return photos(s.lib.Reshuffle())
 }
 
-func imageNames(images []library.Image) []string {
-	names := make([]string, len(images))
+func photos(images []library.Image) []slideplan.Photo {
+	out := make([]slideplan.Photo, len(images))
 	for i, img := range images {
-		names[i] = img.Name
+		out[i] = slideplan.Photo{Name: img.Name, Album: img.Album}
 	}
-	return names
+	return out
 }

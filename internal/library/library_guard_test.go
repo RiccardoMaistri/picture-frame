@@ -20,7 +20,7 @@ func TestRemoveLastThenAdd(t *testing.T) {
 	if !l.Remove("a.jpg") {
 		t.Fatal("remove should report found")
 	}
-	l.Add("b.jpg")
+	l.Add("b.jpg", "", 0)
 	if l.Len() != 1 || !l.Has("b.jpg") {
 		t.Fatalf("after remove+add: len=%d has(b)=%v", l.Len(), l.Has("b.jpg"))
 	}

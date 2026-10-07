@@ -541,6 +541,9 @@
       "ImagePayload": {
         "additionalProperties": false,
         "properties": {
+          "album": {
+            "type": "string"
+          },
           "names": {
             "items": {
               "type": "string"
@@ -558,6 +561,10 @@
               "array",
               "null"
             ]
+          },
+          "year": {
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [

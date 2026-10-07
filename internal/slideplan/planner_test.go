@@ -7,29 +7,37 @@ import (
 	"github.com/MateEke/picture-frame/internal/slideplan"
 )
 
+func ordered(names ...string) []slideplan.Photo {
+	out := make([]slideplan.Photo, len(names))
+	for i, n := range names {
+		out[i] = slideplan.Photo{Name: n}
+	}
+	return out
+}
+
 // orderCalls counts snapshot reads so tests can assert lazy rebuilds.
 type fakeSource struct {
 	mu         sync.Mutex
-	order      []string
-	cycles     [][]string
+	order      []slideplan.Photo
+	cycles     [][]slideplan.Photo
 	orderCalls int
 }
 
-func (f *fakeSource) Order() []string {
+func (f *fakeSource) Order() []slideplan.Photo {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.orderCalls++
-	return append([]string(nil), f.order...)
+	return append([]slideplan.Photo(nil), f.order...)
 }
 
-func (f *fakeSource) NextCycle() []string {
+func (f *fakeSource) NextCycle() []slideplan.Photo {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if len(f.cycles) > 0 {
 		f.order = f.cycles[0]
 		f.cycles = f.cycles[1:]
 	}
-	return append([]string(nil), f.order...)
+	return append([]slideplan.Photo(nil), f.order...)
 }
 
 func (f *fakeSource) calls() int {
@@ -49,7 +57,7 @@ func newPlanner(src slideplan.Source) *slideplan.Planner {
 }
 
 func TestPlannerCurrentBuildsPlan(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2", "P3"}}
+	src := &fakeSource{order: ordered("P1", "P2", "P3")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -70,7 +78,7 @@ func TestPlannerEmpty(t *testing.T) {
 }
 
 func TestPlannerNextAdvances(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2", "P3"}}
+	src := &fakeSource{order: ordered("P1", "P2", "P3")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -82,7 +90,7 @@ func TestPlannerNextAdvances(t *testing.T) {
 }
 
 func TestPlannerRestartCycleStartsFreshFromTop(t *testing.T) {
-	src := &fakeSource{order: []string{"L1", "L2"}, cycles: [][]string{{"P1", "P2"}}}
+	src := &fakeSource{order: ordered("L1", "L2"), cycles: [][]slideplan.Photo{ordered("P1", "P2")}}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -97,7 +105,7 @@ func TestPlannerRestartCycleStartsFreshFromTop(t *testing.T) {
 }
 
 func TestPlannerNextWrapsToNewCycle(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2"}, cycles: [][]string{{"L1"}}}
+	src := &fakeSource{order: ordered("P1", "P2"), cycles: [][]slideplan.Photo{ordered("L1")}}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -109,7 +117,7 @@ func TestPlannerNextWrapsToNewCycle(t *testing.T) {
 }
 
 func TestPlannerNextWrapsToEmpty(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2"}, cycles: [][]string{{}}}
+	src := &fakeSource{order: ordered("P1", "P2"), cycles: [][]slideplan.Photo{ordered()}}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -120,7 +128,7 @@ func TestPlannerNextWrapsToEmpty(t *testing.T) {
 }
 
 func TestPlannerSetConfigUnchangedIsNoop(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2"}}
+	src := &fakeSource{order: ordered("P1", "P2")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 	p.Current()
@@ -136,7 +144,7 @@ func TestPlannerSetConfigUnchangedIsNoop(t *testing.T) {
 }
 
 func TestPlannerSetScreenAspectRebuildsOnlyOnChange(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2"}}
+	src := &fakeSource{order: ordered("P1", "P2")}
 	p := newPlanner(src)
 
 	if got := p.Current(); got == nil || len(got.Names) != 1 {
@@ -161,7 +169,7 @@ func TestPlannerSetScreenAspectRebuildsOnlyOnChange(t *testing.T) {
 }
 
 func TestPlannerSetConfigDisables(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2"}}
+	src := &fakeSource{order: ordered("P1", "P2")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 	if got := p.Current(); len(got.Names) != 2 {
@@ -175,13 +183,13 @@ func TestPlannerSetConfigDisables(t *testing.T) {
 }
 
 func TestPlannerInvalidateRereadsOrder(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2"}}
+	src := &fakeSource{order: ordered("P1", "P2")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 	p.Current()
 
 	src.mu.Lock()
-	src.order = []string{"L1"}
+	src.order = ordered("L1")
 	src.mu.Unlock()
 	p.Invalidate()
 
@@ -191,7 +199,7 @@ func TestPlannerInvalidateRereadsOrder(t *testing.T) {
 }
 
 func TestPlannerNextAfterInvalidateShowsFirstSlide(t *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2", "P3"}}
+	src := &fakeSource{order: ordered("P1", "P2", "P3")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 	p.Current() // [P1 P2], idx 0
@@ -205,7 +213,7 @@ func TestPlannerNextAfterInvalidateShowsFirstSlide(t *testing.T) {
 
 func TestPlannerDirtyRebuildKeepsCursor(t *testing.T) {
 	// A config/aspect change mid-cycle must not jump back to the start and re-show.
-	src := &fakeSource{order: []string{"L1", "L2", "L3", "L4"}}
+	src := &fakeSource{order: ordered("L1", "L2", "L3", "L4")}
 	fit := func(string) (float64, bool) { return landscape, true } // all fit on a landscape screen
 	p := slideplan.NewPlanner(src, fit, slideplan.Threshold{Factor: 1.5}, true)
 	p.SetScreenAspect(landscape)
@@ -222,7 +230,7 @@ func TestPlannerDirtyRebuildKeepsCursor(t *testing.T) {
 func TestPlannerDirtyRebuildClampsShrunkCursor(t *testing.T) {
 	// Enabling split pairs images, shrinking the plan under the cursor; a preserved
 	// idx past the new end must clamp, not read out of range.
-	src := &fakeSource{order: []string{"P1", "P2", "P3", "P4"}}
+	src := &fakeSource{order: ordered("P1", "P2", "P3", "P4")}
 	portrait := func(string) (float64, bool) { return 0.66, true }
 	p := slideplan.NewPlanner(src, portrait, slideplan.Threshold{Factor: 1.5}, false)
 	p.SetScreenAspect(landscape)
@@ -237,7 +245,7 @@ func TestPlannerDirtyRebuildClampsShrunkCursor(t *testing.T) {
 }
 
 func TestPlannerConcurrent(_ *testing.T) {
-	src := &fakeSource{order: []string{"P1", "P2", "P3"}}
+	src := &fakeSource{order: ordered("P1", "P2", "P3")}
 	p := newPlanner(src)
 
 	var wg sync.WaitGroup
@@ -255,7 +263,7 @@ func TestPlannerConcurrent(_ *testing.T) {
 }
 
 func TestPlannerPrevStepsBack(t *testing.T) {
-	src := &fakeSource{order: []string{"a", "b", "c"}}
+	src := &fakeSource{order: ordered("a", "b", "c")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -268,7 +276,7 @@ func TestPlannerPrevStepsBack(t *testing.T) {
 }
 
 func TestPlannerPrevWrapsToLastSlide(t *testing.T) {
-	src := &fakeSource{order: []string{"a", "b", "c"}}
+	src := &fakeSource{order: ordered("a", "b", "c")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -280,7 +288,7 @@ func TestPlannerPrevWrapsToLastSlide(t *testing.T) {
 }
 
 func TestPlannerPrevDoesNotStartANewCycle(t *testing.T) {
-	src := &fakeSource{order: []string{"a", "b"}, cycles: [][]string{{"L1"}}}
+	src := &fakeSource{order: ordered("a", "b"), cycles: [][]slideplan.Photo{ordered("L1")}}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -302,7 +310,7 @@ func TestPlannerPrevEmptyPlan(t *testing.T) {
 }
 
 func TestPlannerPrevRebuildTakesPrecedence(t *testing.T) {
-	src := &fakeSource{order: []string{"a", "b", "c"}}
+	src := &fakeSource{order: ordered("a", "b", "c")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -316,7 +324,7 @@ func TestPlannerPrevRebuildTakesPrecedence(t *testing.T) {
 }
 
 func TestPlannerSlideCount(t *testing.T) {
-	src := &fakeSource{order: []string{"a", "b", "c"}}
+	src := &fakeSource{order: ordered("a", "b", "c")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -327,7 +335,7 @@ func TestPlannerSlideCount(t *testing.T) {
 }
 
 func TestPlannerPeekNextDoesNotAdvance(t *testing.T) {
-	src := &fakeSource{order: []string{"a", "b", "c"}}
+	src := &fakeSource{order: ordered("a", "b", "c")}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)
 
@@ -343,8 +351,8 @@ func TestPlannerPeekNextDoesNotAdvance(t *testing.T) {
 
 func TestPlannerPeekNextAtEndWrapsWithoutNewCycle(t *testing.T) {
 	src := &fakeSource{
-		order:  []string{"a", "b"},
-		cycles: [][]string{{"x", "y"}},
+		order:  ordered("a", "b"),
+		cycles: [][]slideplan.Photo{ordered("x", "y")},
 	}
 	p := newPlanner(src)
 	p.SetScreenAspect(landscape)

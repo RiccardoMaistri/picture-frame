@@ -287,7 +287,7 @@ func (s *server) handleUploadImage(_ context.Context, input *UploadImageInput) (
 	s.recordAspect(name, w, h)
 
 	wasEmpty := s.lib.Len() == 0
-	s.lib.Add(name)
+	s.lib.Add(name, "", 0)
 	s.persistOrder()
 	if wasEmpty && s.slideshow != nil {
 		s.slideshow.Next()

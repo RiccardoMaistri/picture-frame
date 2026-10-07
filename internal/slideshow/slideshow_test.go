@@ -300,7 +300,7 @@ func TestRunResumesAfterAddToEmptyLibrary(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 	}
 
-	lib.Add("a.jpg")
+	lib.Add("a.jpg", "", 0)
 	ss.Next()
 	name := receiveImage(t, ch, time.Second)
 	if name != "a.jpg" {

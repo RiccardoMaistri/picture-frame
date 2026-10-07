@@ -8,10 +8,9 @@ import {
 	isSensorStale,
 	SENSOR_STALE_MS,
 	formatSensorValue,
-	timeAgo,
-	resolveOutsideTemp
+	timeAgo
 } from './helpers';
-import type { SensorPayload, WeatherPayload } from '$lib/api/types.gen';
+import type { SensorPayload } from '$lib/api/types.gen';
 
 const base: SensorPayload = {
 	device_id: 'living_room',
@@ -249,59 +248,6 @@ describe('helpers', () => {
 			const ts = new Date(1_000_000).toISOString();
 			expect(isSensorStale(ts, SENSOR_STALE_MS, 1_000_000 + SENSOR_STALE_MS - 1)).toBe(false);
 			expect(isSensorStale(ts, SENSOR_STALE_MS, 1_000_000 + SENSOR_STALE_MS + 1)).toBe(true);
-		});
-	});
-
-	describe('resolveOutsideTemp', () => {
-		const freshSensor = (value: number): SensorPayload => ({
-			device_id: 'wittboy',
-			role: 'outside',
-			kind: 'temperature',
-			value,
-			timestamp: new Date().toISOString()
-		});
-		const staleSensor = (value: number): SensorPayload => ({
-			device_id: 'wittboy',
-			role: 'outside',
-			kind: 'temperature',
-			value,
-			timestamp: new Date(Date.now() - SENSOR_STALE_MS - 1000).toISOString()
-		});
-		const owm: WeatherPayload = { icon_code: '01d', temp: 17.3, humidity: 55 };
-
-		it('prefers a fresh outside sensor over OWM', () => {
-			expect(resolveOutsideTemp({ 'outside:temperature': freshSensor(11.4) }, owm)).toBe('11.4');
-		});
-
-		it('falls back to OWM when the outside sensor is stale', () => {
-			expect(resolveOutsideTemp({ 'outside:temperature': staleSensor(11.4) }, owm)).toBe('17.3');
-		});
-
-		it('falls back to OWM when no outside sensor is present', () => {
-			expect(resolveOutsideTemp({}, owm)).toBe('17.3');
-		});
-
-		it('returns placeholder when neither sensor nor OWM provide a value', () => {
-			expect(resolveOutsideTemp({}, null)).toBe('--');
-		});
-
-		it('returns placeholder when sensor stale and OWM absent', () => {
-			expect(resolveOutsideTemp({ 'outside:temperature': staleSensor(11.4) }, null)).toBe('--');
-		});
-
-		it('ignores inside-temperature sensors', () => {
-			const inside: SensorPayload = {
-				device_id: 'living_room',
-				role: 'inside',
-				kind: 'temperature',
-				value: 22.7,
-				timestamp: new Date().toISOString()
-			};
-			expect(resolveOutsideTemp({ 'inside:temperature': inside }, owm)).toBe('17.3');
-		});
-
-		it('formats sensor value to 1 decimal', () => {
-			expect(resolveOutsideTemp({ 'outside:temperature': freshSensor(11) }, owm)).toBe('11.0');
 		});
 	});
 });

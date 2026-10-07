@@ -9,20 +9,11 @@ export type ConfigOptions = {
 	hideClockDate?: boolean;
 	/** IANA timezone for the kiosk clock/date; empty follows the device. */
 	timezone?: string;
-	/** Drop all sensors and weather so the overlay can go fully empty. */
-	minimalOverlay?: boolean;
 	/** Slideshow dwell; defaults to the fast 2s the other specs rely on. */
 	slideshowInterval?: string;
 };
 
-// Sentinel labels the kiosk spec asserts on.
-export const LABELS = {
-	outside: 'E2E Outside',
-	inside: 'E2E Inside',
-	humidity: 'E2E Humidity'
-};
-
-/** Per-test server config: fast slideshow, mock sensors, sentinel labels, mock weather. */
+/** Per-test server config: fast slideshow, mock sensors, mock weather. */
 export function renderConfig(opts: ConfigOptions): string {
 	const auth = opts.passwordHash ? `\n[auth]\npassword_hash = "${opts.passwordHash}"\n` : '';
 	// Port 9 refuses fast, so the syncer errors without an external network call.
@@ -39,22 +30,9 @@ ${displayExtra}`;
 interval   = "${opts.slideshowInterval ?? '2s'}"
 images_dir = "${opts.imagesDir}"`;
 
-	if (opts.minimalOverlay) {
-		return `addr = "127.0.0.1:${opts.port}"
-
-${display}
-${slideshow}
-${library}${auth}`;
-	}
-
 	return `addr = "127.0.0.1:${opts.port}"
 
 ${display}
-[display.labels]
-outside  = "${LABELS.outside}"
-inside   = "${LABELS.inside}"
-humidity = "${LABELS.humidity}"
-
 ${slideshow}
 
 [[sensor]]

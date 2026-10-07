@@ -21,45 +21,24 @@ test.describe('kiosk', () => {
 		await expect(kiosk.date).toContainText(/[A-Za-z]/);
 	});
 
-	test('shows the configured cluster labels', async ({ kiosk }) => {
-		await expect(kiosk.labelInside).toHaveText('E2E Inside');
-		await expect(kiosk.labelOutside).toHaveText('E2E Outside');
-		await expect(kiosk.labelHumidity).toHaveText('E2E Humidity');
-	});
-
-	test('shows live sensor temperatures', async ({ kiosk }) => {
-		// Inside drifts, so assert numeric (not the "--" stale placeholder).
-		await expect(kiosk.tempOutside).toContainText('5');
-		await expect(kiosk.tempInside).toContainText(/\d/);
-		await expect(kiosk.tempInside).not.toContainText('--');
-	});
-
-	test('shows the weather icon (mock active in dev)', async ({ kiosk }) => {
-		await expect(kiosk.weatherIcon).toBeVisible();
-		await expect(kiosk.weatherIcon).toHaveAttribute('src', /.+/);
+	// The fs backend has no albums, so the label must stay absent rather than
+	// render an empty string.
+	test('shows no album label when the backend reports none', async ({ kiosk }) => {
+		await expect(kiosk.album).toHaveCount(0);
 	});
 });
 
 test.describe('kiosk overlay visibility', () => {
+	// The fs fixture has no albums, so with the clock hidden there is nothing
+	// left to render and the scrim goes away with it.
 	test.describe('clock and date hidden', () => {
 		test.use({ serverOptions: { hideClockDate: true } });
-
-		test('hides the clock and date but keeps the readings', async ({ kiosk }) => {
-			await kiosk.goto();
-			await kiosk.waitForImage();
-			await expect(kiosk.clock).toHaveCount(0);
-			await expect(kiosk.date).toHaveCount(0);
-			await expect(kiosk.overlay).toBeVisible();
-			await expect(kiosk.tempInside).toBeVisible();
-		});
-	});
-
-	test.describe('nothing configured', () => {
-		test.use({ serverOptions: { minimalOverlay: true, hideClockDate: true } });
 
 		test('hides the whole overlay', async ({ kiosk }) => {
 			await kiosk.goto();
 			await kiosk.waitForImage();
+			await expect(kiosk.clock).toHaveCount(0);
+			await expect(kiosk.date).toHaveCount(0);
 			await expect(kiosk.overlay).toHaveCount(0);
 		});
 	});
@@ -69,8 +48,7 @@ test.describe('kiosk overlay visibility', () => {
 		test.use({ timezoneId: 'UTC' });
 
 		test('offsets the overlay content without moving the scrim', async ({ kiosk, page }) => {
-			// Minute 24: both components non-zero. Readings may show "--" here (the pinned
-			// clock can push them past SENSOR_STALE_MS); this asserts geometry only.
+			// Minute 24: both components non-zero. Geometry only.
 			const fixed = new Date();
 			fixed.setUTCMinutes(24, 0, 0);
 			await page.clock.setFixedTime(fixed);
@@ -91,11 +69,6 @@ test.describe('kiosk overlay visibility', () => {
 			expect(Number.isInteger(clockShift.x)).toBe(true);
 			expect(Number.isInteger(clockShift.y)).toBe(true);
 
-			// Mirrored horizontally so both margins move together; level so the baseline holds.
-			const readingsShift = await kiosk.shiftOf(kiosk.readings);
-			expect(clockShift.x + readingsShift.x).toBe(0);
-			expect(readingsShift.y).toBe(clockShift.y);
-
 			const size = page.viewportSize();
 			if (!size) throw new Error('no viewport size');
 			const overlayBox = await kiosk.overlay.boundingBox();
@@ -104,51 +77,12 @@ test.describe('kiosk overlay visibility', () => {
 			expect(overlayBox.width).toBeCloseTo(size.width, 0);
 			expect(overlayBox.y + overlayBox.height).toBeCloseTo(size.height, 0);
 
-			for (const block of [kiosk.clockBlock, kiosk.readings]) {
-				const box = await block.boundingBox();
-				if (!box) throw new Error('no block box');
-				expect(box.x).toBeGreaterThan(0);
-				expect(box.y).toBeGreaterThan(0);
-				expect(box.x + box.width).toBeLessThan(size.width);
-				expect(box.y + box.height).toBeLessThan(size.height);
-			}
-		});
-
-		// Either block can be configured away, so each must shift on its own.
-		test.describe('readings only', () => {
-			test.use({ serverOptions: { hideClockDate: true } });
-
-			test('still shifts the surviving block', async ({ kiosk, page }) => {
-				const fixed = new Date();
-				fixed.setUTCMinutes(24, 0, 0);
-				await page.clock.setFixedTime(fixed);
-				await kiosk.goto();
-				await kiosk.waitForImage();
-
-				await expect(kiosk.clockBlock).toHaveCount(0);
-				const shift = await kiosk.shiftOf(kiosk.readings);
-				expect(shift.x).toBeGreaterThan(0);
-				expect(Number.isInteger(shift.x)).toBe(true);
-				expect(Number.isInteger(shift.y)).toBe(true);
-			});
-		});
-
-		test.describe('clock only', () => {
-			test.use({ serverOptions: { minimalOverlay: true } });
-
-			test('still shifts the surviving block', async ({ kiosk, page }) => {
-				const fixed = new Date();
-				fixed.setUTCMinutes(24, 0, 0);
-				await page.clock.setFixedTime(fixed);
-				await kiosk.goto();
-				await kiosk.waitForImage();
-
-				await expect(kiosk.readings).toHaveCount(0);
-				const shift = await kiosk.shiftOf(kiosk.clockBlock);
-				expect(shift.x).toBeLessThan(0);
-				expect(Number.isInteger(shift.x)).toBe(true);
-				expect(Number.isInteger(shift.y)).toBe(true);
-			});
+			const box = await kiosk.clockBlock.boundingBox();
+			if (!box) throw new Error('no block box');
+			expect(box.x).toBeGreaterThan(0);
+			expect(box.y).toBeGreaterThan(0);
+			expect(box.x + box.width).toBeLessThan(size.width);
+			expect(box.y + box.height).toBeLessThan(size.height);
 		});
 	});
 

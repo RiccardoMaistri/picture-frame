@@ -2,12 +2,12 @@ package slideplan
 
 import "sync"
 
-// Source supplies the cycle's image names: Order is the current cycle, NextCycle
+// Source supplies the cycle's images: Order is the current cycle, NextCycle
 // advances it (reshuffling when randomized). The Planner calls these without
 // holding its own mutex.
 type Source interface {
-	Order() []string
-	NextCycle() []string
+	Order() []Photo
+	NextCycle() []Photo
 }
 
 // Planner caches the current cycle's slide plan and serves it from a cursor,
@@ -52,7 +52,7 @@ func (p *Planner) RestartCycle() {
 
 // rebuild re-groups order, keeping the cursor (so a config/aspect change doesn't
 // jump back and re-show); only a wrap or out-of-range idx resets to the start.
-func (p *Planner) rebuild(order []string, reset bool) {
+func (p *Planner) rebuild(order []Photo, reset bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.slides = Plan(order, p.screen, p.ratioOf, p.thr, p.enabled)

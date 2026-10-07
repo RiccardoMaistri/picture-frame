@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	testKey      = "test-key-123"
-	testSlug     = "fotolijst"
-	testPassword = "Almafa123"
-	testAlbumID  = "1e4bb746-6072-4aec-9a20-a37b130cde4b"
-	assetA       = "9b7b87ad-f032-442d-a7c3-046fed72e7bc"
-	assetB       = "ab7b87ad-f032-442d-a7c3-046fed72e7bd"
+	testKey       = "test-key-123"
+	testSlug      = "fotolijst"
+	testPassword  = "Almafa123"
+	testAlbumID   = "1e4bb746-6072-4aec-9a20-a37b130cde4b"
+	testAlbumName = "Summer Trip"
+	assetA        = "9b7b87ad-f032-442d-a7c3-046fed72e7bc"
+	assetB        = "ab7b87ad-f032-442d-a7c3-046fed72e7bd"
 )
 
 type recordedRequest struct {
@@ -58,7 +59,7 @@ type fakeImmich struct {
 func newFakeImmich(t *testing.T) *fakeImmich {
 	t.Helper()
 	return &fakeImmich{
-		album:   `{"album":{"id":"` + testAlbumID + `"}}`,
+		album:   `{"album":{"id":"` + testAlbumID + `","albumName":"` + testAlbumName + `"}}`,
 		etag:    `"etag-v1"`,
 		preview: []byte("PREVIEW-BYTES"),
 		status:  http.StatusOK,
@@ -101,7 +102,7 @@ func (f *fakeImmich) handler() http.Handler {
 		case r.URL.Path == "/api/shared-links/me":
 			writeJSON(w, f.album)
 		case r.URL.Path == "/api/albums/"+testAlbumID:
-			serveGate(w, r, etag)
+			serveGate(w, r, etag, testAlbumName)
 		case r.URL.Path == "/api/timeline/buckets":
 			f.serveBuckets(w)
 		case r.URL.Path == "/api/timeline/bucket":
@@ -127,7 +128,8 @@ func (f *fakeImmich) serveLogin(w http.ResponseWriter, r *http.Request, loginSta
 	}
 }
 
-func serveGate(w http.ResponseWriter, r *http.Request, etag string) {
+// The album gate carries the display name the client labels slides with.
+func serveGate(w http.ResponseWriter, r *http.Request, etag, albumName string) {
 	if etag != "" {
 		if r.Header.Get("If-None-Match") == etag {
 			w.WriteHeader(http.StatusNotModified)
@@ -135,7 +137,7 @@ func serveGate(w http.ResponseWriter, r *http.Request, etag string) {
 		}
 		w.Header().Set("ETag", etag)
 	}
-	writeJSON(w, `{"id":"`+testAlbumID+`"}`)
+	writeJSON(w, `{"id":"`+testAlbumID+`","albumName":"`+albumName+`"}`)
 }
 
 func (f *fakeImmich) serveBuckets(w http.ResponseWriter) {
@@ -343,6 +345,12 @@ func TestListReturnsImageAssetsOnly(t *testing.T) {
 	}
 	if got[0].ID != assetA || got[1].ID != assetB {
 		t.Errorf("ids: %v", got)
+	}
+	// The shared link points at one album, so every asset carries its name.
+	for _, a := range got {
+		if a.Album != testAlbumName {
+			t.Errorf("asset %s album = %q, want %q", a.ID, a.Album, testAlbumName)
+		}
 	}
 	for _, a := range got {
 		if len(a.Version) != 16 {

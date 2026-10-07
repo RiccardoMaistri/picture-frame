@@ -21,7 +21,9 @@ func ValidImageName(name string) bool {
 
 // Image represents a stored image file.
 type Image struct {
-	Name string // filename only, e.g. "1716038400000.jpg"
+	Name    string // filename only, e.g. "1716038400000.jpg"
+	Album   string // source album; zero for local uploads
+	Year    int    // year of the album's earliest photo; zero when unknown
 }
 
 // Library maintains the canonical image order (admin source of truth) plus the
@@ -91,11 +93,31 @@ func (l *Library) Has(name string) bool {
 
 // Add appends a new image to the canonical order and the current cycle so it
 // shows without waiting for a reshuffle.
-func (l *Library) Add(name string) {
+func (l *Library) Add(name, album string, year int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.images = append(l.images, Image{Name: name})
-	l.cycle = append(l.cycle, Image{Name: name})
+	img := Image{Name: name, Album: album, Year: year}
+	l.images = append(l.images, img)
+	l.cycle = append(l.cycle, img)
+}
+
+// SetAlbums refreshes the album of already-loaded images from a name→album
+// mapping. The library is rebuilt from disk on every boot, so album details only
+// reach the slideshow again once the syncer re-lists the remote. Names absent
+// from the mapping (local uploads) keep their zero album.
+func (l *Library) SetAlbums(albums map[string]string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for i := range l.images {
+		if album, ok := albums[l.images[i].Name]; ok {
+			l.images[i].Album = album
+		}
+	}
+	for i := range l.cycle {
+		if album, ok := albums[l.cycle[i].Name]; ok {
+			l.cycle[i].Album = album
+		}
+	}
 }
 
 // Remove deletes the first image with name from both slices; false if absent
