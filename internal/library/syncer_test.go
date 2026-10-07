@@ -287,6 +287,29 @@ func TestSyncTriggerCoalesces(t *testing.T) {
 	s.Trigger()
 }
 
+func TestSyncRefreshesDetailsOnWarmCache(t *testing.T) {
+	root, lib := setup(t)
+	// Simulate a boot from disk: the file is cached but the library starts
+	// with zero details, as adapter.Load provides names only.
+	name := idA + "-1.jpg"
+	if err := os.WriteFile(filepath.Join(root.Name(), name), []byte("seed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lib.Add(name, "", 0)
+	r := &fakeRemote{}
+	r.set(library.Asset{ID: idA, Version: "1", Album: "Cina", Year: 2023})
+	s := library.NewSyncer(testutil.NopLogger(), r, lib, root, time.Hour, &fakeAdvancer{})
+	runOnce(t, s)
+
+	if lib.Len() != 1 {
+		t.Fatalf("library len = %d, want 1 (cached file must not re-download)", lib.Len())
+	}
+	got := lib.List()[0]
+	if got.Album != "Cina" || got.Year != 2023 {
+		t.Errorf("details = %+v, want Album Cina Year 2023", got)
+	}
+}
+
 func TestSyncDeletesRemovedAssets(t *testing.T) {
 	root, lib := setup(t)
 	// Seed local with two files; remote has only one.

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/MateEke/picture-frame/internal/library"
@@ -164,34 +163,29 @@ func (c *APIClient) albumChanged(ctx context.Context, a *albumState) (changed bo
 
 // enumerate lists one album's image assets via the timeline API, the same
 // listing the shared-link client uses, authenticated by API key. Every asset
-// carries the album name and the year of the album's earliest photo (from the
-// first non-empty bucket) so the kiosk can label a slide without another lookup.
+// carries the album name and the taken year shared by the album (from the
+// earliest photo's taken date, falling back to the bucket name).
 func (c *APIClient) enumerate(ctx context.Context, albumID, albumName string) ([]library.Asset, int, error) {
-	var buckets []timelineBucketMeta
-	if err := c.getJSON(ctx, "/api/timeline/buckets", url.Values{"albumId": {albumID}}, &buckets); err != nil {
+	var metas []timelineBucketMeta
+	if err := c.getJSON(ctx, "/api/timeline/buckets", url.Values{"albumId": {albumID}}, &metas); err != nil {
 		return nil, 0, fmt.Errorf("immich: list buckets: %w", err)
 	}
-	// Find the year of the earliest bucket that contains images.
-	var year int
-	for _, b := range buckets {
-		if b.Count > 0 && len(b.TimeBucket) >= 4 && b.TimeBucket[0] >= '0' && b.TimeBucket[0] <= '9' {
-			var err error
-			year, err = strconv.Atoi(b.TimeBucket[:4])
-			if err == nil && year >= 1000 && year <= 9999 {
-				break
-			}
+	bodies := make([]timelineBucket, 0, len(metas))
+	for _, m := range metas {
+		var body timelineBucket
+		q := url.Values{"albumId": {albumID}, "timeBucket": {m.TimeBucket}}
+		if err := c.getJSON(ctx, "/api/timeline/bucket", q, &body); err != nil {
+			return nil, 0, fmt.Errorf("immich: bucket %s: %w", m.TimeBucket, err)
 		}
+		bodies = append(bodies, body)
 	}
+	// One label per album: the taken year is shared, so compute it once.
+	year := albumYear(bodies, metas)
 	var out []library.Asset
-	for _, b := range buckets {
-		var bucket timelineBucket
-		q := url.Values{"albumId": {albumID}, "timeBucket": {b.TimeBucket}}
-		if err := c.getJSON(ctx, "/api/timeline/bucket", q, &bucket); err != nil {
-			return nil, 0, fmt.Errorf("immich: bucket %s: %w", b.TimeBucket, err)
-		}
-		out = appendImageAssets(out, bucket, albumName, year)
+	for _, body := range bodies {
+		out = appendImageAssets(out, body, albumName, year)
 	}
-	return out, len(buckets), nil
+	return out, len(metas), nil
 }
 
 // Fetch returns the preview-sized thumbnail stream for assetID.

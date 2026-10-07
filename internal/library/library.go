@@ -21,9 +21,9 @@ func ValidImageName(name string) bool {
 
 // Image represents a stored image file.
 type Image struct {
-	Name    string // filename only, e.g. "1716038400000.jpg"
-	Album   string // source album; zero for local uploads
-	Year    int    // year of the album's earliest photo; zero when unknown
+	Name  string // filename only, e.g. "1716038400000.jpg"
+	Album string // source album; zero for local uploads
+	Year  int    // year of the album's earliest photo; zero when unknown
 }
 
 // Library maintains the canonical image order (admin source of truth) plus the
@@ -101,21 +101,31 @@ func (l *Library) Add(name, album string, year int) {
 	l.cycle = append(l.cycle, img)
 }
 
-// SetAlbums refreshes the album of already-loaded images from a name→album
-// mapping. The library is rebuilt from disk on every boot, so album details only
-// reach the slideshow again once the syncer re-lists the remote. Names absent
-// from the mapping (local uploads) keep their zero album.
-func (l *Library) SetAlbums(albums map[string]string) {
+// Details carries the remote-known display metadata for one synced file:
+// the source album and the year of the album's earliest photo.
+type Details struct {
+	Album string
+	Year  int
+}
+
+// SetDetails refreshes the album and year of already-loaded images from a
+// name→details mapping. The library is rebuilt from disk on every boot, so
+// cached files start with zero details; the syncer re-applies them on every
+// successful list, which is what makes the kiosk label warm caches correctly.
+// Names absent from the mapping (local uploads) keep their zero details.
+func (l *Library) SetDetails(details map[string]Details) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for i := range l.images {
-		if album, ok := albums[l.images[i].Name]; ok {
-			l.images[i].Album = album
+		if d, ok := details[l.images[i].Name]; ok {
+			l.images[i].Album = d.Album
+			l.images[i].Year = d.Year
 		}
 	}
 	for i := range l.cycle {
-		if album, ok := albums[l.cycle[i].Name]; ok {
-			l.cycle[i].Album = album
+		if d, ok := details[l.cycle[i].Name]; ok {
+			l.cycle[i].Album = d.Album
+			l.cycle[i].Year = d.Year
 		}
 	}
 }

@@ -213,7 +213,7 @@ func (s *Syncer) syncOnce(ctx context.Context) bool {
 		return false
 	}
 	s.cleanTmp()
-	s.lib.SetAlbums(albumsOf(remote))
+	s.lib.SetDetails(detailsOf(remote))
 
 	// Drop manifest entries whose file vanished (manual deletes, crashed
 	// removals) so they re-download instead of looking cached.
@@ -460,17 +460,18 @@ func (s *Syncer) writeAtomic(ctx context.Context, id, tmp, final string) (int64,
 // strings stay UI-safe and bounded.
 func safeErrorMessage(s string) string { return redact.Path(s) }
 
-// albumsOf maps each remote asset's local filename to its album. Assets with no
-// album (a provider that reports none) are left out so the library keeps what it
-// has rather than blanking known details, and an unversioned asset is skipped
-// because its filename is not derivable yet.
-func albumsOf(remote []Asset) map[string]string {
-	out := make(map[string]string, len(remote))
+// detailsOf maps each remote asset's local filename to its display details
+// (album and year). Assets with no album (a provider that reports none) are
+// left out so the library keeps what it has rather than blanking known
+// details, and an unversioned asset is skipped because its filename is not
+// derivable yet.
+func detailsOf(remote []Asset) map[string]Details {
+	out := make(map[string]Details, len(remote))
 	for _, a := range remote {
 		if a.Album == "" || a.Version == "" {
 			continue
 		}
-		out[SyncedFilename(a)] = string(a.Album)
+		out[SyncedFilename(a)] = Details{Album: string(a.Album), Year: a.Year}
 	}
 	return out
 }

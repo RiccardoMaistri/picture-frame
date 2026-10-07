@@ -224,35 +224,29 @@ func (c *Client) albumChanged(ctx context.Context, albumID string) (changed bool
 // enumerate lists the album's image assets via the timeline API (the only
 // key-authenticated listing after Immich v3 dropped AlbumResponseDto.assets) and
 // returns the number of buckets it fetched. Every asset carries the album name
-// and the year of the album's earliest photo (from the first non-empty bucket).
+// and the taken year shared by the album (from the earliest photo's taken
+// date, falling back to the bucket name).
 func (c *Client) enumerate(ctx context.Context, albumID string) ([]library.Asset, int, error) {
-	var buckets []timelineBucketMeta
-	if err := c.getJSON(ctx, "/api/timeline/buckets", url.Values{"albumId": {albumID}}, &buckets); err != nil {
+	var metas []timelineBucketMeta
+	if err := c.getJSON(ctx, "/api/timeline/buckets", url.Values{"albumId": {albumID}}, &metas); err != nil {
 		return nil, 0, fmt.Errorf("immich: list buckets: %w", err)
 	}
-	// Find the year of the earliest bucket that contains images. Immich's
-	// timeline buckets are ordered oldest-first, so the first bucket with
-	// Count > 0 gives the album's year.
-	var year int
-	for _, b := range buckets {
-		if b.Count > 0 && len(b.TimeBucket) >= 4 && b.TimeBucket[0] >= '0' && b.TimeBucket[0] <= '9' {
-			var err error
-			year, err = strconv.Atoi(b.TimeBucket[:4])
-			if err == nil && year >= 1000 && year <= 9999 {
-				break
-			}
+	bodies := make([]timelineBucket, 0, len(metas))
+	for _, m := range metas {
+		var body timelineBucket
+		q := url.Values{"albumId": {albumID}, "timeBucket": {m.TimeBucket}}
+		if err := c.getJSON(ctx, "/api/timeline/bucket", q, &body); err != nil {
+			return nil, 0, fmt.Errorf("immich: bucket %s: %w", m.TimeBucket, err)
 		}
+		bodies = append(bodies, body)
 	}
+	// One label per album: the taken year is shared, so compute it once.
+	year := albumYear(bodies, metas)
 	var out []library.Asset
-	for _, b := range buckets {
-		var bucket timelineBucket
-		q := url.Values{"albumId": {albumID}, "timeBucket": {b.TimeBucket}}
-		if err := c.getJSON(ctx, "/api/timeline/bucket", q, &bucket); err != nil {
-			return nil, 0, fmt.Errorf("immich: bucket %s: %w", b.TimeBucket, err)
-		}
-		out = appendImageAssets(out, bucket, c.albumName, year)
+	for _, body := range bodies {
+		out = appendImageAssets(out, body, c.albumName, year)
 	}
-	return out, len(buckets), nil
+	return out, len(metas), nil
 }
 
 type timelineBucketMeta struct {
@@ -262,9 +256,45 @@ type timelineBucketMeta struct {
 
 // timelineBucket is the columnar (struct-of-arrays) shape Immich returns per bucket.
 type timelineBucket struct {
-	ID        []string `json:"id"`
-	IsImage   []bool   `json:"isImage"`
-	Thumbhash []string `json:"thumbhash"`
+	ID               []string  `json:"id"`
+	IsImage          []bool    `json:"isImage"`
+	Thumbhash        []string  `json:"thumbhash"`
+	FileCreatedAt    []string  `json:"fileCreatedAt"`
+	LocalOffsetHours []float64 `json:"localOffsetHours"`
+}
+
+// albumYear returns the year of the album's earliest taken photo, computed
+// once from the bucket contents (oldest-first): fileCreatedAt is UTC, so the
+// photo's local offset is added back to recover the photographer's local
+// time, whose year is the kiosk label. When no photo carries a parseable
+// taken date (older servers omit those columns), it falls back to the
+// oldest date-like bucket name. Returns 0 when neither yields a year.
+func albumYear(bodies []timelineBucket, metas []timelineBucketMeta) int {
+	for _, b := range bodies {
+		for i, ts := range b.FileCreatedAt {
+			if ts == "" {
+				continue
+			}
+			t, err := time.Parse(time.RFC3339, ts)
+			if err != nil {
+				continue
+			}
+			if i < len(b.LocalOffsetHours) {
+				t = t.Add(time.Duration(b.LocalOffsetHours[i] * float64(time.Hour)))
+			}
+			if y := t.Year(); y >= 1000 && y <= 9999 {
+				return y
+			}
+		}
+	}
+	for _, m := range metas {
+		if len(m.TimeBucket) >= 4 && m.TimeBucket[0] >= '0' && m.TimeBucket[0] <= '9' {
+			if y, err := strconv.Atoi(m.TimeBucket[:4]); err == nil && y >= 1000 && y <= 9999 {
+				return y
+			}
+		}
+	}
+	return 0
 }
 
 // appendImageAssets maps the columnar payload to image assets, tolerating short

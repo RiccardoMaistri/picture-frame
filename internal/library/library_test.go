@@ -101,6 +101,25 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+func TestSetDetails(t *testing.T) {
+	l := library.New(imgs("a.jpg", "b.jpg"), false)
+	l.SetDetails(map[string]library.Details{
+		"a.jpg": {Album: "Cina", Year: 2023},
+	})
+	got := l.List()
+	if got[0].Album != "Cina" || got[0].Year != 2023 {
+		t.Errorf("a.jpg details = %+v, want Album Cina Year 2023", got[0])
+	}
+	if got[1].Album != "" || got[1].Year != 0 {
+		t.Errorf("b.jpg details = %+v, want zero details", got[1])
+	}
+	for _, img := range l.Cycle() {
+		if img.Name == "a.jpg" && (img.Album != "Cina" || img.Year != 2023) {
+			t.Errorf("cycle a.jpg details = %+v, want Album Cina Year 2023", img)
+		}
+	}
+}
+
 func TestRemoveFound(t *testing.T) {
 	l := library.New(imgs("a.jpg", "b.jpg", "c.jpg"), false)
 	if !l.Remove("b.jpg") {

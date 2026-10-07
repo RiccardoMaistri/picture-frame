@@ -156,14 +156,20 @@ func (f *fakeImmich) serveBucket(w http.ResponseWriter) {
 	assets := append([]fakeAsset(nil), f.assets...)
 	f.mu.Unlock()
 	var cols struct {
-		ID        []string `json:"id"`
-		IsImage   []bool   `json:"isImage"`
-		Thumbhash []string `json:"thumbhash"`
+		ID               []string  `json:"id"`
+		IsImage          []bool    `json:"isImage"`
+		Thumbhash        []string  `json:"thumbhash"`
+		FileCreatedAt    []string  `json:"fileCreatedAt"`
+		LocalOffsetHours []float64 `json:"localOffsetHours"`
 	}
 	for _, a := range assets {
 		cols.ID = append(cols.ID, a.id)
 		cols.IsImage = append(cols.IsImage, a.isImage)
 		cols.Thumbhash = append(cols.Thumbhash, a.thumbhash)
+		// Taken just before midnight UTC; +1h lands in 2026 local,
+		// so a 2026 year assertion proves the offset is applied.
+		cols.FileCreatedAt = append(cols.FileCreatedAt, "2025-12-31T23:30:00.000Z")
+		cols.LocalOffsetHours = append(cols.LocalOffsetHours, 1)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(cols)
@@ -350,6 +356,13 @@ func TestListReturnsImageAssetsOnly(t *testing.T) {
 	for _, a := range got {
 		if a.Album != testAlbumName {
 			t.Errorf("asset %s album = %q, want %q", a.ID, a.Album, testAlbumName)
+		}
+	}
+	// The fake dates sit just before midnight UTC with a +1h offset, so 2026
+	// proves the year comes from the local taken date, not the bucket name.
+	for _, a := range got {
+		if a.Year != 2026 {
+			t.Errorf("asset %s year = %d, want 2026", a.ID, a.Year)
 		}
 	}
 	for _, a := range got {

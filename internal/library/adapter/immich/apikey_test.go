@@ -102,14 +102,20 @@ func (f *fakeAPIImmich) handler() http.Handler {
 				return
 			}
 			var cols struct {
-				ID        []string `json:"id"`
-				IsImage   []bool   `json:"isImage"`
-				Thumbhash []string `json:"thumbhash"`
+				ID               []string  `json:"id"`
+				IsImage          []bool    `json:"isImage"`
+				Thumbhash        []string  `json:"thumbhash"`
+				FileCreatedAt    []string  `json:"fileCreatedAt"`
+				LocalOffsetHours []float64 `json:"localOffsetHours"`
 			}
 			for _, a := range assets {
 				cols.ID = append(cols.ID, a.id)
 				cols.IsImage = append(cols.IsImage, a.isImage)
 				cols.Thumbhash = append(cols.Thumbhash, a.thumbhash)
+				// Taken just before midnight UTC; +1h lands in 2026 local,
+				// so the year assertion below proves the offset is applied.
+				cols.FileCreatedAt = append(cols.FileCreatedAt, "2025-12-31T23:30:00.000Z")
+				cols.LocalOffsetHours = append(cols.LocalOffsetHours, 1)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(cols)
@@ -421,13 +427,80 @@ func TestAPIClientMergesMultipleAlbums(t *testing.T) {
 			t.Errorf("asset[%d] = %s, want %s (full: %v)", i, got[i].ID, id, got)
 		}
 	}
-// Each asset is labelled with its own album, so the kiosk can group a pair.
-// A shared photo keeps the first album that claimed it.
+	// Each asset is labelled with its own album, so the kiosk can group a pair.
+	// A shared photo keeps the first album that claimed it.
 	wantAlbums := []string{"Trip", "Trip", "Wedding"}
 	for i, album := range wantAlbums {
 		if got[i].Album != album {
 			t.Errorf("asset[%d] album = %q, want %q", i, got[i].Album, album)
 		}
+	}
+	// The fake serves one 2026 bucket per album, so every asset carries that year.
+	for i := range got {
+		if got[i].Year != 2026 {
+			t.Errorf("asset[%d] year = %d, want 2026", i, got[i].Year)
+		}
+	}
+}
+
+// The year comes from inside the photos, not the bucket name: here the
+// bucket says 2020 while the photo was taken in 2023.
+func TestAPIClientYearComesFromPhotoDates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/timeline/buckets":
+			writeJSON(w, `[{"timeBucket":"2020-01-01","count":1}]`)
+		case "/api/timeline/bucket":
+			writeJSON(w, `{"id":["`+assetA+`"],"isImage":[true],"thumbhash":["ha"],`+
+				`"fileCreatedAt":["2023-06-15T10:00:00.000Z"],"localOffsetHours":[0]}`)
+		case "/api/albums/" + testAPIAlbum:
+			writeJSON(w, `{"id":"`+testAPIAlbum+`","albumName":"Trip"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := newAPIClientFor(t, srv, testAPIAlbum)
+
+	got, err := c.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d assets, want 1", len(got))
+	}
+	if got[0].Year != 2023 {
+		t.Errorf("year = %d, want 2023 (photo taken date, not 2020 bucket name)", got[0].Year)
+	}
+}
+
+// Older servers omit the taken-date columns from bucket bodies; the year
+// then falls back to the oldest date-like bucket name.
+func TestAPIClientFallsBackToBucketNameForYear(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/timeline/buckets":
+			writeJSON(w, `[{"timeBucket":"2021-03-01","count":1}]`)
+		case "/api/timeline/bucket":
+			writeJSON(w, `{"id":["`+assetA+`"],"isImage":[true],"thumbhash":["ha"]}`)
+		case "/api/albums/" + testAPIAlbum:
+			writeJSON(w, `{"id":"`+testAPIAlbum+`","albumName":"Trip"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := newAPIClientFor(t, srv, testAPIAlbum)
+
+	got, err := c.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d assets, want 1", len(got))
+	}
+	if got[0].Year != 2021 {
+		t.Errorf("year = %d, want 2021 (bucket-name fallback)", got[0].Year)
 	}
 }
 

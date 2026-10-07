@@ -81,7 +81,7 @@
 				class="text-3xl font-semibold tracking-widest uppercase opacity-94 portrait:max-w-full"
 				style="transform: {shift.trail}"
 			>
-				{album} ({year})
+				{album}{#if year} ({year}){/if}
 			</div>
 		{/if}
 	</div>
