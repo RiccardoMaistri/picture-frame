@@ -175,7 +175,7 @@ func (c *Client) listOnce(ctx context.Context) ([]library.Asset, error) {
 	if err != nil {
 		return nil, err
 	}
-	changed, etag, err := c.albumChanged(ctx, albumID)
+	changed, year, etag, err := c.albumChanged(ctx, albumID)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (c *Client) listOnce(ctx context.Context) ([]library.Asset, error) {
 		c.log.Debug("immich: album unchanged, served from cache", "assets", len(c.cached))
 		return c.cached, nil
 	}
-	assets, buckets, err := c.enumerate(ctx, albumID)
+	assets, buckets, err := c.enumerate(ctx, albumID, year)
 	if err != nil {
 		return nil, err
 	}
@@ -193,14 +193,16 @@ func (c *Client) listOnce(ctx context.Context) ([]library.Asset, error) {
 }
 
 // albumChanged conditional-GETs the album: a 304 reuses the cache, a 200 means
-// re-enumerate. It returns the new ETag rather than storing it, so listOnce can
+// re-enumerate. The 200 body also carries startDate (the earliest asset's
+// local taken date), so the gate is also where the album year is learned for
+// free. It returns the new ETag rather than storing it, so listOnce can
 // commit it only with a successful enumeration (else a failed enumeration would
 // leave a stale cache behind an advanced ETag).
-func (c *Client) albumChanged(ctx context.Context, albumID string) (changed bool, etag string, err error) {
+func (c *Client) albumChanged(ctx context.Context, albumID string) (changed bool, year int, etag string, err error) {
 	forceFull := !c.loaded || c.albumETag == ""
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/api/albums/"+albumID, nil), nil)
 	if err != nil {
-		return false, "", err
+		return false, 0, "", err
 	}
 	c.addAuthCookie(req)
 	if !forceFull {
@@ -208,25 +210,31 @@ func (c *Client) albumChanged(ctx context.Context, albumID string) (changed bool
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return false, "", fmt.Errorf("immich: album gate: %w", err)
+		return false, 0, "", fmt.Errorf("immich: album gate: %w", err)
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusNotModified:
-		return false, "", nil
+		return false, 0, "", nil
 	case http.StatusOK:
-		return true, resp.Header.Get("ETag"), nil
+		var album Album
+		if err := json.NewDecoder(resp.Body).Decode(&album); err != nil {
+			return false, 0, "", fmt.Errorf("immich: decode album %s: %w", albumID, err)
+		}
+		return true, yearFromStartDate(album.StartDate), resp.Header.Get("ETag"), nil
 	default:
-		return false, "", &httpError{Status: resp.StatusCode}
+		return false, 0, "", &httpError{Status: resp.StatusCode}
 	}
 }
 
 // enumerate lists the album's image assets via the timeline API (the only
 // key-authenticated listing after Immich v3 dropped AlbumResponseDto.assets) and
 // returns the number of buckets it fetched. Every asset carries the album name
-// and the taken year shared by the album (from the earliest photo's taken
-// date, falling back to the bucket name).
-func (c *Client) enumerate(ctx context.Context, albumID string) ([]library.Asset, int, error) {
+// and the taken year shared by the album: preferYear (the album's startDate,
+// already learned by the ETag gate) wins, so no photo date is parsed in the
+// common case; a zero preferYear falls back to the earliest photo's taken
+// date, then to the bucket name.
+func (c *Client) enumerate(ctx context.Context, albumID string, preferYear int) ([]library.Asset, int, error) {
 	var metas []timelineBucketMeta
 	if err := c.getJSON(ctx, "/api/timeline/buckets", url.Values{"albumId": {albumID}}, &metas); err != nil {
 		return nil, 0, fmt.Errorf("immich: list buckets: %w", err)
@@ -241,7 +249,10 @@ func (c *Client) enumerate(ctx context.Context, albumID string) ([]library.Asset
 		bodies = append(bodies, body)
 	}
 	// One label per album: the taken year is shared, so compute it once.
-	year := albumYear(bodies, metas)
+	year := preferYear
+	if year == 0 {
+		year = albumYear(bodies, metas)
+	}
 	var out []library.Asset
 	for _, body := range bodies {
 		out = appendImageAssets(out, body, c.albumName, year)
@@ -261,6 +272,17 @@ type timelineBucket struct {
 	Thumbhash        []string  `json:"thumbhash"`
 	FileCreatedAt    []string  `json:"fileCreatedAt"`
 	LocalOffsetHours []float64 `json:"localOffsetHours"`
+}
+
+// yearFromStartDate extracts the year from an album's startDate (the earliest
+// asset's local taken date, "YYYY-MM-DD" or RFC3339). Returns 0 when absent.
+func yearFromStartDate(s string) int {
+	if len(s) >= 4 && s[0] >= '0' && s[0] <= '9' {
+		if y, err := strconv.Atoi(s[:4]); err == nil && y >= 1000 && y <= 9999 {
+			return y
+		}
+	}
+	return 0
 }
 
 // albumYear returns the year of the album's earliest taken photo, computed

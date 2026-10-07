@@ -10,11 +10,13 @@ import (
 
 // Album is one album as listed by the Immich API. The field names mirror
 // Immich's own camelCase JSON so the response decodes without a translation
-// layer.
+// layer. StartDate is the earliest asset's local taken date (what the Albums
+// UI groups by); its year is the kiosk label, so no photo lookup is needed.
 type Album struct {
 	ID         string `json:"id"`
 	AlbumName  string `json:"albumName"`
 	AssetCount int    `json:"assetCount"`
+	StartDate  string `json:"startDate"`
 }
 
 // ListAlbums returns every album visible to the API key, so the admin UI can
