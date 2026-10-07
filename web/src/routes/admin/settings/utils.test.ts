@@ -106,6 +106,10 @@ describe('settings utils', () => {
 				])
 			).toBe(true);
 		});
+
+		it('treats a lan presence sensor as motion (display keepalive)', () => {
+			expect(hasMotionSensor([{ ...base, type: 'lan', hosts: ['192.168.1.50'] }])).toBe(true);
+		});
 	});
 
 	describe('createEmptyConfig', () => {

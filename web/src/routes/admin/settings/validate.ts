@@ -21,6 +21,8 @@ export function sensorTypeError(s: SensorDto): string | null {
 			return bleError(s);
 		case 'mqtt-subscriber':
 			return mqttSubscriberError(s);
+		case 'lan':
+			return lanError(s);
 		default:
 			return null; // mock has no required fields
 	}
@@ -45,11 +47,18 @@ function mqttSubscriberError(s: SensorDto): string | null {
 	return null;
 }
 
+function lanError(s: SensorDto): string | null {
+	if (!(s.hosts ?? []).some((h) => (h ?? '').trim())) return 'At least one phone IP is required.';
+	return null;
+}
+
 function sensorKinds(s: SensorDto): string[] {
 	const kinds: string[] = [];
 	for (const c of s.characteristics ?? []) if (c.kind) kinds.push(c.kind);
 	for (const r of s.mock_readings ?? []) if (r.kind) kinds.push(r.kind);
 	if (s.kind) kinds.push(s.kind);
+	// LAN presence emits motion=1 as its display keepalive.
+	if (s.type === 'lan') kinds.push('motion');
 	return kinds;
 }
 

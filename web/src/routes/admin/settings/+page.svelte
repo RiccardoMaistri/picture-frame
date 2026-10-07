@@ -377,6 +377,7 @@
 						<div class="space-y-4 px-2 pt-0 pb-4 md:px-4">
 							<SensorsCard
 								bind:sensors={draft.sensors}
+								savedSensors={savedConfig.sensors}
 								bind:bluetoothAdapter={draft.bluetooth_adapter}
 								savedBluetoothAdapter={savedConfig.bluetooth_adapter}
 								{adapters}

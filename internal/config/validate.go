@@ -108,10 +108,14 @@ func (s SensorConfig) validate() error {
 		}
 	case "mock":
 		// no required fields
+	case "lan":
+		if len(s.Hosts) == 0 {
+			return fmt.Errorf("lan sensor missing hosts (static phone IPs)")
+		}
 	case "":
 		return fmt.Errorf("missing type")
 	default:
-		return fmt.Errorf("unknown type %q (valid: ble, mqtt-subscriber, mock)", s.Type)
+		return fmt.Errorf("unknown type %q (valid: ble, mqtt-subscriber, mock, lan)", s.Type)
 	}
 	return nil
 }

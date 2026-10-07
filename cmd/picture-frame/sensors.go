@@ -19,6 +19,7 @@ import (
 	"github.com/MateEke/picture-frame/internal/sensors"
 	"github.com/MateEke/picture-frame/internal/sensors/ble"
 	bleadapter "github.com/MateEke/picture-frame/internal/sensors/ble/adapter"
+	"github.com/MateEke/picture-frame/internal/sensors/lan"
 	mocksensor "github.com/MateEke/picture-frame/internal/sensors/mock"
 	"github.com/MateEke/picture-frame/internal/sensors/mqttsubscriber"
 	"github.com/MateEke/picture-frame/internal/startup"
@@ -206,6 +207,14 @@ func buildSources(log *slog.Logger, cfg *config.Config, hub *mqtt.Hub) []sensors
 			}
 			sources = append(sources, mocksensor.New(sensorCfg.ID, interval, readings...))
 			log.Info("mock sensor configured", "id", sensorCfg.ID, "readings", len(readings), "interval", interval)
+		case "lan":
+			src, err := lan.New(log, sensorCfg)
+			if err != nil {
+				log.Error("skipping lan sensor", "id", sensorCfg.ID, "err", err)
+				continue
+			}
+			sources = append(sources, src)
+			log.Info("lan presence configured", "id", sensorCfg.ID, "hosts", sensorCfg.Hosts)
 		}
 	}
 	return sources

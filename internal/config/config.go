@@ -175,7 +175,7 @@ type KioskLabelsConfig struct {
 // Fields used depend on Type: see each backend's documentation.
 type SensorConfig struct {
 	ID   string `toml:"id"`
-	Type string `toml:"type"` // "ble" | "mqtt-subscriber" | "mock"
+	Type string `toml:"type"` // "ble" | "mqtt-subscriber" | "mock" | "lan"
 	// Role tags this sensor's readings (e.g. "inside"); the kiosk indexes by role,
 	// not device ID, so any sensor type can fill any display position.
 	Role string `toml:"role"`
@@ -196,6 +196,9 @@ type SensorConfig struct {
 
 	// Mock
 	MockReadings []MockReadingConfig `toml:"mock_reading"`
+
+	// LAN presence (ping): static phone IPs, any reachable = home.
+	Hosts []string `toml:"hosts"`
 }
 
 type MockReadingConfig struct {

@@ -3,12 +3,15 @@
 	import { PencilIcon, PlusIcon, TrashIcon } from '@lucide/svelte';
 	import SensorDialog from './SensorDialog.svelte';
 	import Field from './Field.svelte';
+	import ToggleRow from './ToggleRow.svelte';
+	import LanFields from './LanFields.svelte';
 	import DeviceCombobox from './DeviceCombobox.svelte';
 
 	const TYPE_LABELS: Record<string, string> = {
 		ble: 'Bluetooth',
 		'mqtt-subscriber': 'MQTT',
-		mock: 'Mock'
+		mock: 'Mock',
+		lan: 'WiFi presence'
 	};
 
 	function sensorKinds(s: SensorDto): string[] {
@@ -19,11 +22,14 @@
 		for (const c of s.characteristics ?? []) add(c.kind);
 		for (const r of s.mock_readings ?? []) add(r.kind);
 		add(s.kind);
+		// LAN presence emits motion=1 as its display keepalive.
+		if (s.type === 'lan') add('motion');
 		return kinds;
 	}
 
 	let {
 		sensors = $bindable(),
+		savedSensors,
 		bluetoothAdapter = $bindable(),
 		savedBluetoothAdapter,
 		adapters,
@@ -31,6 +37,7 @@
 		errors
 	}: {
 		sensors: SensorDto[] | null;
+		savedSensors: SensorDto[] | null;
 		bluetoothAdapter: string;
 		savedBluetoothAdapter: string;
 		adapters: string[];
@@ -40,6 +47,35 @@
 
 	// undefined = closed, null = adding new, SensorDto = editing existing
 	let dialogSensor = $state<SensorDto | null | undefined>(undefined);
+
+	// Phone presence manages the LAN sensor(s) directly: toggle + hosts inline.
+	const lanOf = (list: SensorDto[] | null | undefined) => (list ?? []).filter((s) => s.type === 'lan');
+	const lanIdx = $derived((sensors ?? []).findIndex((s) => s.type === 'lan'));
+	const presenceOn = $derived(lanIdx >= 0);
+	const presenceChanged = $derived(
+		JSON.stringify(lanOf(sensors)) !== JSON.stringify(lanOf(savedSensors))
+	);
+
+	function setPresence(on: boolean) {
+		if (on && lanIdx < 0) {
+			const taken = new Set((sensors ?? []).map((s) => s.id));
+			let id = 'phones';
+			for (let n = 2; taken.has(id); n++) id = `phones_${n}`;
+			sensors = [
+				...(sensors ?? []),
+				{ id, type: 'lan', role: 'presence', hosts: [], poll_interval: '30s' }
+			];
+		} else if (!on) {
+			sensors = (sensors ?? []).filter((s) => s.type !== 'lan');
+		}
+	}
+
+	function revertPresence() {
+		sensors = [
+			...(sensors ?? []).filter((s) => s.type !== 'lan'),
+			...structuredClone(lanOf(savedSensors))
+		];
+	}
 
 	function handleSensorSave(newSensor: SensorDto, oldSensor?: SensorDto | null) {
 		const list = sensors ?? [];
@@ -66,6 +102,23 @@
 	>
 		<DeviceCombobox bind:value={bluetoothAdapter} options={adapters} placeholder="hci0" />
 	</Field>
+	<div class="border-surface-300-700 space-y-4 border-t pt-4">
+		<ToggleRow
+			label="Phone presence (WiFi ping)"
+			checked={presenceOn}
+			changed={presenceChanged}
+			onchange={setPresence}
+			onrevert={revertPresence}
+			testId="presence-toggle"
+		/>
+		<p class="text-surface-500-400 -mt-2 text-xs">
+			Ping your phones' static IPs; any phone home keeps the screen on. The idle-blank
+			timeout is the away grace.
+		</p>
+		{#if sensors && lanIdx >= 0}
+			<LanFields bind:draft={sensors[lanIdx]} testIdPrefix="presence" />
+		{/if}
+	</div>
 	<div class="border-surface-300-700 space-y-2 border-t pt-4">
 		<span class="label-text">Sensors</span>
 		{#if (sensors ?? []).length === 0}

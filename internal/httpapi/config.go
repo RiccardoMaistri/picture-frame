@@ -116,7 +116,7 @@ func (s *server) registerConfigRoutes(api huma.API) {
 			Kinds:        []string{"temperature", "humidity", "motion"},
 			Units:        []string{"standard", "metric", "imperial"},
 			Backends:     []string{config.BackendFS, config.BackendImmich},
-			SensorTypes:  []string{"ble", "mqtt-subscriber", "mock"},
+			SensorTypes:  []string{"ble", "mqtt-subscriber", "mock", "lan"},
 			AddressTypes: []string{"random", "public"},
 			LogLevels:    []string{"debug", "info", "warn", "error"},
 		}}, nil

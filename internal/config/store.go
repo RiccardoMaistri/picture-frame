@@ -68,6 +68,7 @@ func cloneConfig(c Config) Config {
 			out.Sensors[i] = s
 			out.Sensors[i].Characteristics = append([]CharacteristicConfig(nil), s.Characteristics...)
 			out.Sensors[i].MockReadings = append([]MockReadingConfig(nil), s.MockReadings...)
+			out.Sensors[i].Hosts = append([]string(nil), s.Hosts...)
 		}
 	}
 	if c.Immich.AlbumIDs != nil {

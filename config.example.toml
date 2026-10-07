@@ -215,6 +215,16 @@ backend = "fs"
 # kind  = "motion"
 # value = 1.0
 
+# LAN presence (ping): screen stays on while any static phone IP answers.
+# Needs DHCP reservations + device-MAC (no private-MAC) on the phones.
+# Emits motion=1 when home (display keepalive); display.blank_after is the
+# away grace (e.g. "8m").
+# [[sensor]]
+# id            = "phones"
+# type          = "lan"
+# hosts         = ["192.168.1.50", "192.168.1.51"]
+# poll_interval = "30s"
+
 # Weather (OpenWeatherMap)
 
 [weather]

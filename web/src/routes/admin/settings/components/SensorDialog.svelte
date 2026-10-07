@@ -7,6 +7,7 @@
 	import BleFields from './BleFields.svelte';
 	import MqttSubscriberFields from './MqttSubscriberFields.svelte';
 	import MockFields from './MockFields.svelte';
+	import LanFields from './LanFields.svelte';
 	import { sensorTypeError } from '../validate';
 
 	let {
@@ -28,7 +29,8 @@
 	const TYPE_LABELS: Record<string, string> = {
 		ble: 'Bluetooth',
 		'mqtt-subscriber': 'MQTT',
-		mock: 'Mock'
+		mock: 'Mock',
+		lan: 'WiFi presence'
 	};
 
 	let draft = $state<SensorDto>(createEmpty());
@@ -46,7 +48,7 @@
 	}
 
 	function toSensorType(v: string | null): SensorDto['type'] | undefined {
-		if (v === 'ble' || v === 'mqtt-subscriber' || v === 'mock') return v;
+		if (v === 'ble' || v === 'mqtt-subscriber' || v === 'mock' || v === 'lan') return v;
 		return undefined;
 	}
 
@@ -55,6 +57,8 @@
 		for (const c of s.characteristics ?? []) if (c.kind) kinds.push(c.kind);
 		for (const r of s.mock_readings ?? []) if (r.kind) kinds.push(r.kind);
 		if (s.kind) kinds.push(s.kind);
+		// LAN presence emits motion=1 as its display keepalive.
+		if (s.type === 'lan') kinds.push('motion');
 		return kinds;
 	}
 
@@ -135,7 +139,7 @@
 						</Field>
 					</div>
 
-					<Field label="Type" help="Bluetooth (BLE), an MQTT topic, or a built-in mock source.">
+					<Field label="Type" help="Bluetooth (BLE), an MQTT topic, a built-in mock source, or WiFi phone presence.">
 						<select
 							class="select"
 							value={draft.type}
@@ -153,6 +157,8 @@
 						<MqttSubscriberFields bind:draft {meta} />
 					{:else if draft.type === 'mock'}
 						<MockFields bind:draft {meta} />
+					{:else if draft.type === 'lan'}
+						<LanFields bind:draft={draft} />
 					{/if}
 
 					{#if typeError}

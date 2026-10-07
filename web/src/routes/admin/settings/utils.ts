@@ -5,9 +5,11 @@ export const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringi
 
 // hasMotionSensor reports whether any configured sensor publishes a motion kind.
 // Idle-blank only auto-wakes on a motion event, so without one the screen blanks
-// and never wakes, the UI disables blank_after in that case.
+// and never wakes, the UI disables blank_after in that case. LAN presence counts:
+// it emits motion=1 as its display keepalive.
 export function hasMotionSensor(sensors: SensorDto[] | null | undefined): boolean {
 	return (sensors ?? []).some((s) => {
+		if (s.type === 'lan') return true;
 		if (s.kind === 'motion') return true;
 		if (s.characteristics?.some((c) => c.kind === 'motion')) return true;
 		return s.mock_readings?.some((r) => r.kind === 'motion') ?? false;

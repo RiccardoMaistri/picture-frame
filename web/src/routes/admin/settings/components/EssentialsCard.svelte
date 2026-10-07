@@ -62,7 +62,7 @@
 
 	<DurationSlider
 		label="Turn screen off when idle"
-		help="A motion sensor wakes the screen after it blanks."
+		help="A motion or presence sensor wakes the screen after it blanks."
 		stops={DURATION_STOPS.blankAfter}
 		zeroLabel="Never"
 		disabled={!motion}
@@ -72,7 +72,7 @@
 	/>
 	{#if !motion}
 		<p class="text-surface-500-400 -mt-3 text-xs">
-			Add a motion sensor to enable idle blanking. Without one, the screen couldn't wake again.
+			Add a motion or presence sensor to enable idle blanking. Without one, the screen couldn't wake again.
 		</p>
 	{/if}
 

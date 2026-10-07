@@ -106,6 +106,11 @@ func (s SensorConfig) kinds() []string {
 			kinds = append(kinds, reading.Kind)
 		}
 		return kinds
+	case "lan":
+		// Presence reuses the motion keepalive: any host reachable emits
+		// motion=1, which wakes the display and resets blank_after; silence
+		// lets it blank. No policy change needed.
+		return []string{"motion"}
 	}
 	return nil
 }

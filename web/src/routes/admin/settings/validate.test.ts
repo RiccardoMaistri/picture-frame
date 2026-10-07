@@ -419,6 +419,41 @@ describe('settings validate', () => {
 				'Collides with "x" on role "inside", reading "temperature".'
 			);
 		});
+
+		it('flags a lan sensor with no phone IPs', () => {
+			const cfg = createEmptyConfig();
+			cfg.sensors = [{ id: 'phones', type: 'lan', role: 'presence', hosts: [] }];
+			expect(validate(cfg).sensors.phones).toMatch(/phone ip/i);
+		});
+
+		it('flags a lan sensor with only blank phone IPs', () => {
+			const cfg = createEmptyConfig();
+			cfg.sensors = [{ id: 'phones', type: 'lan', role: 'presence', hosts: ['  '] }];
+			expect(validate(cfg).sensors.phones).toMatch(/phone ip/i);
+		});
+
+		it('accepts a lan sensor with a phone IP', () => {
+			const cfg = createEmptyConfig();
+			cfg.sensors = [{ id: 'phones', type: 'lan', role: 'presence', hosts: ['192.168.1.50'] }];
+			expect(validate(cfg).issues).toEqual([]);
+		});
+
+		it('detects a lan/motion role collision (lan emits motion)', () => {
+			const cfg = createEmptyConfig();
+			cfg.sensors = [
+				{ id: 'phones', type: 'lan', role: 'inside', hosts: ['192.168.1.50'] },
+				{
+					id: 'm1',
+					type: 'mqtt-subscriber',
+					role: 'inside',
+					topic: 't/m1',
+					kind: 'motion',
+					parser: 'onoff_to_bool'
+				}
+			];
+			cfg.mqtt.broker = 'tcp://host:1883';
+			expect(validate(cfg).sensors.m1).toMatch(/collides/i);
+		});
 	});
 
 	describe('issue ordering', () => {

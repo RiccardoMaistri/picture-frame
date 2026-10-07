@@ -420,6 +420,7 @@ export type ScreenStateResponse = {
 export type SensorDto = {
     address_type?: 'random' | 'public';
     characteristics?: Array<CharacteristicDto> | null;
+    hosts?: Array<string> | null;
     id: string;
     json_field?: string;
     kind?: string;
@@ -430,7 +431,7 @@ export type SensorDto = {
     reset_after?: string;
     role: string;
     topic?: string;
-    type: 'ble' | 'mqtt-subscriber' | 'mock';
+    type: 'ble' | 'mqtt-subscriber' | 'mock' | 'lan';
 };
 
 export type SensorPayload = {

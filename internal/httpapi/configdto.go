@@ -165,7 +165,7 @@ type MqttBridgeDTO struct {
 // SensorDTO maps config.SensorConfig.
 type SensorDTO struct {
 	ID              string              `json:"id"`
-	Type            string              `json:"type" enum:"ble,mqtt-subscriber,mock"`
+	Type            string              `json:"type" enum:"ble,mqtt-subscriber,mock,lan"`
 	Role            string              `json:"role"`
 	MAC             string              `json:"mac,omitempty"`
 	AddressType     string              `json:"address_type,omitempty" enum:"random,public"`
@@ -177,6 +177,7 @@ type SensorDTO struct {
 	Parser          string              `json:"parser,omitempty"`
 	JSONField       string              `json:"json_field,omitempty"`
 	MockReadings    []MockReadingDTO    `json:"mock_readings,omitempty"`
+	Hosts           []string            `json:"hosts,omitempty"`
 }
 
 // CharacteristicDTO maps config.CharacteristicConfig.
@@ -287,6 +288,7 @@ func sensorToDTO(s config.SensorConfig) SensorDTO {
 		Parser:          s.Parser,
 		JSONField:       s.JSONField,
 		MockReadings:    readings,
+		Hosts:           s.Hosts,
 	}
 }
 
@@ -442,6 +444,7 @@ func sensorFromDTO(dto SensorDTO, prev config.SensorConfig, field string) (confi
 		Parser:          dto.Parser,
 		JSONField:       dto.JSONField,
 		MockReadings:    readings,
+		Hosts:           dto.Hosts,
 	}, nil
 }
 

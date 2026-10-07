@@ -1048,6 +1048,15 @@
               "null"
             ]
           },
+          "hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -1088,7 +1097,8 @@
             "enum": [
               "ble",
               "mqtt-subscriber",
-              "mock"
+              "mock",
+              "lan"
             ],
             "type": "string"
           }
