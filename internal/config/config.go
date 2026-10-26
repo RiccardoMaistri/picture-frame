@@ -29,20 +29,20 @@ type AuthConfig struct {
 
 // Config holds all runtime configuration for the application.
 type Config struct {
-	Addr             string          `toml:"addr"`
-	LogLevel         string          `toml:"log_level"`         // "debug", "info", "warn", "error"; default "info"
-	BluetoothAdapter string          `toml:"bluetooth_adapter"` // HCI device ID, e.g. "hci0" or "hci1"
-	Display          DisplayConfig   `toml:"display"`
-	Slideshow        SlideshowConfig `toml:"slideshow"`
-	Library          LibraryConfig   `toml:"library"`
-	Immich           ImmichConfig    `toml:"immich"`
-	Cache            CacheConfig     `toml:"cache"`
-	Sensors          []SensorConfig  `toml:"sensor"`
-	Weather          WeatherConfig   `toml:"weather"`
-	Mqtt             MqttConfig      `toml:"mqtt"`
-	WiFi             WiFiConfig      `toml:"wifi"`
-	Auth             AuthConfig      `toml:"auth"`
-	Updater          UpdaterConfig   `toml:"updater"`
+	Addr             string                `toml:"addr"`
+	LogLevel         string                `toml:"log_level"`         // "debug", "info", "warn", "error"; default "info"
+	BluetoothAdapter string                `toml:"bluetooth_adapter"` // HCI device ID, e.g. "hci0" or "hci1"
+	Display          DisplayConfig         `toml:"display"`
+	Slideshow        SlideshowConfig       `toml:"slideshow"`
+	Library          LibraryConfig         `toml:"library"`
+	Immich           ImmichConfig          `toml:"immich"`
+	Cache            CacheConfig           `toml:"cache"`
+	Sensors          []SensorConfig        `toml:"sensor"`
+	Weather          WeatherConfig         `toml:"weather"`
+	Mqtt             MqttConfig            `toml:"mqtt"`
+	WiFi             WiFiConfig            `toml:"wifi"`
+	Auth             AuthConfig            `toml:"auth"`
+	Updater          UpdaterConfig         `toml:"updater"`
 	SuspendSchedule  SuspendScheduleConfig `toml:"suspend_schedule"`
 }
 
