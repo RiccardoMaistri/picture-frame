@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/MateEke/picture-frame/internal/batterytracker"
 	"github.com/MateEke/picture-frame/internal/hostmetrics"
@@ -55,31 +54,21 @@ func TestBatteryTrackerSamplingAndStats(t *testing.T) {
 	}
 }
 
-func TestBatteryTrackerDeepSleep(t *testing.T) {
+func TestBatteryTrackerExcludesCharging(t *testing.T) {
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "battery.json")
 
-	now := time.Now()
-	// Create sample history with a 8 hour gap simulating deep sleep suspend
-	samples := []batterytracker.Sample{
-		{Timestamp: now.Add(-10 * time.Hour), Pct: 100, ScreenOn: false, Charging: false},
-		{Timestamp: now.Add(-8 * time.Hour), Pct: 96, ScreenOn: false, Charging: false}, // 2hr screen off -> 2%/hr
-		{Timestamp: now.Add(-1 * time.Hour), Pct: 89, ScreenOn: false, Charging: false}, // 7hr suspend -> 1%/hr
-	}
-
-	data, _ := os.ReadFile(storePath) // ensure dir exists
-	_ = data
-	// Save pre-populated samples
-	jsonData, _ := os.ReadFile("nonexistent")
-	_ = jsonData
-
-	mm := &mockMetrics{m: hostmetrics.Metrics{HasBattery: true, BatteryPct: 89, BatteryCharging: false}}
-	md := &mockDisplay{on: false}
+	mm := &mockMetrics{m: hostmetrics.Metrics{HasBattery: true, BatteryPct: 80, BatteryCharging: true}}
+	md := &mockDisplay{on: true}
 
 	tracker := batterytracker.New(nil, mm, md, storePath)
-	// Sample once to trigger run
-	_ = tracker
+	tracker.Sample(context.Background())
 
-	// Load manually to test stats computation on structured samples
-	_ = samples
+	stats := tracker.GetStats()
+	if !stats.Charging {
+		t.Errorf("expected Charging = true")
+	}
+	if stats.ScreenOn.SufficientData {
+		t.Errorf("expected no discharge statistics when charging")
+	}
 }
