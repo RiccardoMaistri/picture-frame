@@ -1,9 +1,8 @@
 import os
 import math
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFilter
 
 def find_perspective_coeffs(src_coords, dst_coords):
-    # src_coords and dst_coords are lists of 4 (x,y) tuples
     matrix = []
     for (x, y), (u, v) in zip(dst_coords, src_coords):
         matrix.append([x, y, 1, 0, 0, 0, -u*x, -u*y])
@@ -15,7 +14,6 @@ def find_perspective_coeffs(src_coords, dst_coords):
         B.append(u)
         B.append(v)
 
-    # Solve A * X = B using Gaussian elimination
     n = 8
     for i in range(n):
         max_row = i
@@ -39,132 +37,151 @@ def find_perspective_coeffs(src_coords, dst_coords):
 
     return B
 
+def draw_immich_logo(size=800):
+    logo = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(logo)
+
+    cx, cy = size / 2, size / 2
+    r_outer = size * 0.42
+    r_inner = size * 0.08
+
+    colors = [
+        (239, 68, 68, 255),   # Red
+        (245, 158, 11, 255),  # Amber
+        (16, 185, 129, 255),  # Green
+        (59, 130, 246, 255),  # Blue
+        (236, 72, 153, 255)   # Pink
+    ]
+
+    for i in range(5):
+        angle = i * 72.0 - 90.0
+        color = colors[i]
+
+        points = []
+        num_steps = 100
+        for step in range(num_steps + 1):
+            t = step / num_steps
+            rad = t * math.pi
+            w = math.sin(rad) ** 0.8 * (r_outer - r_inner)
+            d = r_inner + t * (r_outer - r_inner)
+            curve = math.sin(t * math.pi) * 0.25 * (r_outer - r_inner)
+
+            px = d
+            py = curve + w * 0.4
+
+            a_rad = math.radians(angle)
+            rx = cx + px * math.cos(a_rad) - py * math.sin(a_rad)
+            ry = cy + px * math.sin(a_rad) + py * math.cos(a_rad)
+            points.append((rx, ry))
+
+        for step in range(num_steps, -1, -1):
+            t = step / num_steps
+            rad = t * math.pi
+            w = math.sin(rad) ** 0.8 * (r_outer - r_inner)
+            d = r_inner + t * (r_outer - r_inner)
+            curve = math.sin(t * math.pi) * 0.25 * (r_outer - r_inner)
+
+            px = d
+            py = curve - w * 0.4
+
+            a_rad = math.radians(angle)
+            rx = cx + px * math.cos(a_rad) - py * math.sin(a_rad)
+            ry = cy + px * math.sin(a_rad) + py * math.cos(a_rad)
+            points.append((rx, ry))
+
+        draw.polygon(points, fill=color)
+
+    return logo
+
 def create_ios_icon():
     canvas_size = 1024
-    img = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 255))
 
-    # Create background with soft dark gradient and subtle central spotlight
-    bg = Image.new("RGBA", (canvas_size, canvas_size), (15, 20, 30, 255))
-    bg_draw = ImageDraw.Draw(bg)
+    # Background: Modern iOS dark background gradient
+    bg = Image.new("RGBA", (canvas_size, canvas_size), (15, 23, 42, 255))
 
-    # Radial glow in center
+    # Central soft ambient glow
     cx, cy = canvas_size // 2, canvas_size // 2
     glow = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
-    for r in range(450, 0, -5):
-        alpha = int(35 * (1 - r / 450))
-        glow_draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(50, 80, 130, alpha))
+    for r in range(480, 0, -5):
+        alpha = int(45 * (1 - r / 480))
+        glow_draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(56, 189, 248, alpha))
     bg = Image.alpha_composite(bg, glow)
 
-    # Surface Tablet Perspective Coordinates (1024x1024 space)
-    outer_quad = [
-        (180, 240),  # TL
-        (840, 180),  # TR
-        (800, 780),  # BR
-        (220, 840)   # BL
-    ]
+    # Load user-provided Surface icon (/tmp/file_attachments/image.png)
+    surface_path = "/tmp/file_attachments/image.png"
+    surface_raw = Image.open(surface_path).convert("RGBA")
 
+    # Scale surface line-art image to canvas
+    surface_scaled = surface_raw.resize((canvas_size, canvas_size), Image.Resampling.LANCZOS)
+
+    # Recolor black lines into bright silver-white lines, masking out the pen at bottom right
+    flat = surface_scaled.get_flattened_data() if hasattr(surface_scaled, 'get_flattened_data') else surface_scaled.getdata()
+    lines_data = []
+    for idx, pixel in enumerate(flat):
+        x = idx % canvas_size
+        y = idx // canvas_size
+        # Mask out the pen at bottom right (x > 460 and y > 760)
+        if x > 460 and y > 760:
+            lines_data.append((0, 0, 0, 0))
+        else:
+            lines_data.append((240, 245, 255, pixel[3]))
+
+    surface_lines = Image.new("RGBA", (canvas_size, canvas_size))
+    surface_lines.putdata(lines_data)
+
+    # Screen inner polygon coordinates in 1024x1024 space:
+    # TL: (182, 195), TR: (686, 195), BR: (878, 689), BL: (389, 865)
     screen_quad = [
-        (210, 270),  # TL
-        (810, 215),  # TR
-        (775, 745),  # BR
-        (245, 798)   # BL
+        (182, 195),
+        (686, 195),
+        (878, 689),
+        (389, 865)
     ]
 
-    # Shadow layer
-    shadow = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    shadow_draw = ImageDraw.Draw(shadow)
+    # Fill screen area with dark display glass background
+    screen_mask = Image.new("L", (canvas_size, canvas_size), 0)
+    screen_mask_draw = ImageDraw.Draw(screen_mask)
+    screen_mask_draw.polygon(screen_quad, fill=255)
 
-    shadow_quad = [(x + 20, y + 45) for x, y in outer_quad]
-    shadow_draw.polygon(shadow_quad, fill=(0, 0, 0, 160))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(30))
+    screen_bg = Image.new("RGBA", (canvas_size, canvas_size), (10, 15, 26, 255))
+    bg.paste(screen_bg, (0, 0), screen_mask)
 
-    bg = Image.alpha_composite(bg, shadow)
+    # Render Immich Logo onto screen_quad in perspective
+    logo_size = 800
+    immich_logo = draw_immich_logo(logo_size)
 
-    # Outer Surface Body / Kickstand bevel (Dark Magnesium / Titanium finish)
-    body = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
-    body_draw = ImageDraw.Draw(body)
-
-    # Outer frame
-    body_draw.polygon(outer_quad, fill=(32, 35, 42, 255), outline=(65, 70, 82, 255))
-
-    # Metallic edge highlight on top & left
-    body_draw.line([outer_quad[3], outer_quad[0], outer_quad[1]], fill=(140, 150, 170, 220), width=6)
-
-    bg = Image.alpha_composite(bg, body)
-
-    # Render Content onto the Screen
-    sw, sh = 1200, 800
-    screen_src = Image.new("RGBA", (sw, sh), (12, 14, 20, 255))
-
-    # Subtle dark wallpaper pattern/gradient on the Surface screen
-    screen_draw = ImageDraw.Draw(screen_src)
-    for y in range(sh):
-        interp = y / sh
-        r = int(18 * (1 - interp) + 8 * interp)
-        g = int(24 * (1 - interp) + 12 * interp)
-        b = int(36 * (1 - interp) + 20 * interp)
-        screen_draw.line([(0, y), (sw, y)], fill=(r, g, b, 255))
-
-    # Load Immich Logo & Remove white box background
-    immich_path = "/tmp/file_attachments/image.png"
-    if os.path.exists(immich_path):
-        immich_img = Image.open(immich_path).convert("RGBA")
-
-        # Transparent background for white/near-white pixels
-        datas = immich_img.getdata()
-        newData = []
-        for item in datas:
-            if item[0] > 240 and item[1] > 240 and item[2] > 240:
-                newData.append((255, 255, 255, 0))
-            else:
-                newData.append(item)
-        immich_img.putdata(newData)
-
-        # Resize Immich logo to fit nicely on the Surface screen
-        logo_size = 480
-        immich_img = immich_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-
-        # Center logo on Surface screen
-        lx = (sw - logo_size) // 2
-        ly = (sh - logo_size) // 2
-        screen_src.paste(immich_img, (lx, ly), immich_img)
-
-    # Add subtle glass glare line on screen before perspective transformation
-    glare = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
-    glare_draw = ImageDraw.Draw(glare)
-    glare_draw.polygon([(0, 0), (sw * 0.7, 0), (0, sh * 0.7)], fill=(255, 255, 255, 22))
-    screen_src = Image.alpha_composite(screen_src, glare)
-
-    # Warp screen_src into screen_quad
-    src_corners = [(0, 0), (sw, 0), (sw, sh), (0, sh)]
+    src_corners = [(0, 0), (logo_size, 0), (logo_size, logo_size), (0, logo_size)]
     coeffs = find_perspective_coeffs(src_corners, screen_quad)
 
-    warped_screen = screen_src.transform(
+    warped_logo = immich_logo.transform(
         (canvas_size, canvas_size),
         Image.Transform.PERSPECTIVE,
         coeffs,
         Image.Resampling.BICUBIC
     )
 
-    bg = Image.alpha_composite(bg, warped_screen)
+    # Composite logo onto screen
+    bg = Image.alpha_composite(bg, warped_logo)
 
-    # Screen Glass Bezel Border Highlight
-    bezel_draw = ImageDraw.Draw(bg)
-    bezel_draw.polygon(screen_quad, outline=(50, 55, 65, 255), width=3)
+    # Add subtle glass glare reflection across the screen
+    glare = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+    glare_draw = ImageDraw.Draw(glare)
+    glare_draw.polygon([(182, 195), (500, 195), (250, 700)], fill=(255, 255, 255, 18))
+    bg = Image.alpha_composite(bg, glare)
 
-    # Save outputs
+    # Composite the white Surface tablet line art (kickstand, bezels; pen masked out) on top
+    bg = Image.alpha_composite(bg, surface_lines)
+
+    # Save output images
     os.makedirs("web/static", exist_ok=True)
 
-    # 512x512
     icon512 = bg.resize((512, 512), Image.Resampling.LANCZOS)
     icon512.save("web/static/icon-512.png", "PNG")
 
-    # 180x180 (Apple Touch Icon)
     icon180 = bg.resize((180, 180), Image.Resampling.LANCZOS)
     icon180.save("web/static/apple-touch-icon.png", "PNG")
 
-    # 192x192 (PWA Icon)
     icon192 = bg.resize((192, 192), Image.Resampling.LANCZOS)
     icon192.save("web/static/icon-192.png", "PNG")
 
