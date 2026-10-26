@@ -210,6 +210,9 @@
           "slideshow": {
             "$ref": "#/components/schemas/SlideshowDTO"
           },
+          "suspend_schedule": {
+            "$ref": "#/components/schemas/SuspendScheduleDTO"
+          },
           "updater": {
             "$ref": "#/components/schemas/UpdaterDTO"
           },
@@ -226,7 +229,8 @@
           "sensors",
           "weather",
           "mqtt",
-          "updater"
+          "updater",
+          "suspend_schedule"
         ],
         "type": "object"
       },
@@ -368,6 +372,9 @@
           "slideshow": {
             "$ref": "#/components/schemas/SlideshowDTO"
           },
+          "suspend_schedule": {
+            "$ref": "#/components/schemas/SuspendScheduleDTO"
+          },
           "updater": {
             "$ref": "#/components/schemas/UpdaterDTO"
           },
@@ -385,7 +392,8 @@
           "sensors",
           "weather",
           "mqtt",
-          "updater"
+          "updater",
+          "suspend_schedule"
         ],
         "type": "object"
       },
@@ -1361,6 +1369,42 @@
           "randomize",
           "split_screen",
           "images_dir"
+        ],
+        "type": "object"
+      },
+      "SuspendScheduleDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "weekday_suspend_end": {
+            "type": "string"
+          },
+          "weekday_suspend_start": {
+            "type": "string"
+          },
+          "weekday_wake_at": {
+            "type": "string"
+          },
+          "weekend_suspend_end": {
+            "type": "string"
+          },
+          "weekend_suspend_start": {
+            "type": "string"
+          },
+          "weekend_wake_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "weekday_suspend_start",
+          "weekday_suspend_end",
+          "weekday_wake_at",
+          "weekend_suspend_start",
+          "weekend_suspend_end",
+          "weekend_wake_at"
         ],
         "type": "object"
       },

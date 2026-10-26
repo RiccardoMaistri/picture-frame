@@ -619,6 +619,33 @@ func TestNeedsRestartIdenticalConfigs(t *testing.T) {
 
 // Both UpdateHour edges must be accepted: the schema rejects out-of-range
 // values, and applyUpdaterDTO's own guard must agree with it exactly.
+func TestSuspendScheduleDTORoundTrip(t *testing.T) {
+	cfg := fullTestConfig()
+	cfg.SuspendSchedule = config.SuspendScheduleConfig{
+		Enabled:             true,
+		WeekdaySuspendStart: "22:30",
+		WeekdaySuspendEnd:   "06:15",
+		WeekdayWakeAt:       "06:30",
+		WeekendSuspendStart: "00:30",
+		WeekendSuspendEnd:   "09:15",
+		WeekendWakeAt:       "09:30",
+	}
+
+	dto := toDTO(cfg)
+	if !dto.SuspendSchedule.Enabled || dto.SuspendSchedule.WeekdaySuspendStart != "22:30" || dto.SuspendSchedule.WeekendWakeAt != "09:30" {
+		t.Fatalf("toDTO SuspendSchedule: %+v", dto.SuspendSchedule)
+	}
+
+	out, err := applyDTO(dto, cfg)
+	if err != nil {
+		t.Fatalf("applyDTO: %v", err)
+	}
+
+	if out.SuspendSchedule != cfg.SuspendSchedule {
+		t.Errorf("round-trip: got %+v, want %+v", out.SuspendSchedule, cfg.SuspendSchedule)
+	}
+}
+
 func TestApplyDTOUpdateHourEdges(t *testing.T) {
 	for _, hour := range []int{0, 23} {
 		dto := toDTO(fullTestConfig())

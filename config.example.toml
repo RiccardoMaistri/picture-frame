@@ -312,3 +312,14 @@ auto_update = true       # nightly auto-apply of same-major releases
 update_hour = 2          # device-local hour (0–23) for the scheduled check+apply
 # github_repo  = ""      # override the release source ("owner/name") for forks
 # github_token = ""      # auth for a private release source (PF_GITHUB_TOKEN env also works)
+
+
+# Automatic overnight deep sleep schedule (suspend + RTC wake)
+[suspend_schedule]
+enabled               = true
+weekday_suspend_start = "23:00"
+weekday_suspend_end   = "06:30"
+weekday_wake_at       = "07:00"
+weekend_suspend_start = "23:00"
+weekend_suspend_end   = "08:30"
+weekend_wake_at       = "09:00"

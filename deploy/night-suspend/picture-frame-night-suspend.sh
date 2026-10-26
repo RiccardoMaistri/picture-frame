@@ -15,9 +15,14 @@ CONF=/etc/default/picture-frame-night-suspend
 # shellcheck source=/dev/null
 [[ -r $CONF ]] && . "$CONF"
 
-WAKE_AT=${WAKE_AT:-07:00}
-SUSPEND_START=${SUSPEND_START:-23:00}
-SUSPEND_END=${SUSPEND_END:-06:30}
+WEEKDAY_SUSPEND_START=${WEEKDAY_SUSPEND_START:-${SUSPEND_START:-23:00}}
+WEEKDAY_SUSPEND_END=${WEEKDAY_SUSPEND_END:-${SUSPEND_END:-06:30}}
+WEEKDAY_WAKE_AT=${WEEKDAY_WAKE_AT:-${WAKE_AT:-07:00}}
+
+WEEKEND_SUSPEND_START=${WEEKEND_SUSPEND_START:-${SUSPEND_START:-23:00}}
+WEEKEND_SUSPEND_END=${WEEKEND_SUSPEND_END:-${SUSPEND_END:-08:30}}
+WEEKEND_WAKE_AT=${WEEKEND_WAKE_AT:-${WAKE_AT:-09:00}}
+
 RTC=${RTC:-/dev/rtc0}
 RTWAKE=${RTWAKE:-/usr/sbin/rtcwake}
 
@@ -28,21 +33,53 @@ to_minutes() {
     echo $((10#$hh * 60 + 10#$mm))
 }
 
-now_minutes=$((10#$(date +%H) * 60 + 10#$(date +%M)))
-start_minutes=$(to_minutes "$SUSPEND_START")
-end_minutes=$(to_minutes "$SUSPEND_END")
+get_schedule() {
+    local spec=$1
+    local dow
+    dow=$(date -d "$spec" +%u) # 1=Mon .. 7=Sun
+    if ((dow == 6 || dow == 7)); then
+        echo "$WEEKEND_SUSPEND_START $WEEKEND_SUSPEND_END $WEEKEND_WAKE_AT"
+    else
+        echo "$WEEKDAY_SUSPEND_START $WEEKDAY_SUSPEND_END $WEEKDAY_WAKE_AT"
+    fi
+}
 
-# Only suspend inside the configured window (it normally crosses midnight).
-if ((start_minutes < end_minutes)); then
-    ((now_minutes >= start_minutes && now_minutes <= end_minutes)) || exit 0
+now_minutes=$((10#$(date +%H) * 60 + 10#$(date +%M)))
+wake_at=""
+
+# 1. Check if Today's schedule window is currently active.
+read -r today_start today_end today_wake <<< "$(get_schedule "today")"
+t_start_min=$(to_minutes "$today_start")
+t_end_min=$(to_minutes "$today_end")
+
+if ((t_start_min < t_end_min)); then
+    if ((now_minutes >= t_start_min && now_minutes <= t_end_min)); then
+        wake_at=$today_wake
+    fi
 else
-    ((now_minutes >= start_minutes || now_minutes <= end_minutes)) || exit 0
+    if ((now_minutes >= t_start_min)); then
+        wake_at=$today_wake
+    fi
 fi
 
-wake_epoch=$(date -d "today $WAKE_AT" +%s)
+# 2. If not active today, check if Yesterday's overnight window crosses into today.
+if [[ -z $wake_at ]]; then
+    read -r yest_start yest_end yest_wake <<< "$(get_schedule "yesterday")"
+    y_start_min=$(to_minutes "$yest_start")
+    y_end_min=$(to_minutes "$yest_end")
+
+    if ((y_start_min >= y_end_min && now_minutes <= y_end_min)); then
+        wake_at=$yest_wake
+    fi
+fi
+
+# If outside any suspend window, exit cleanly.
+[[ -n $wake_at ]] || exit 0
+
+wake_epoch=$(date -d "today $wake_at" +%s)
 now_epoch=$(date +%s)
 if ((wake_epoch <= now_epoch + 60)); then
-    wake_epoch=$(date -d "tomorrow $WAKE_AT" +%s)
+    wake_epoch=$(date -d "tomorrow $wake_at" +%s)
 fi
 
 # Replace any stale alarm, then arm the wake time. If this fails, do not
