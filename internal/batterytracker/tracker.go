@@ -133,7 +133,7 @@ func (t *Tracker) save() {
 		_ = os.MkdirAll(dir, 0o755)
 	}
 	tmp := t.storePath + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		t.log.Warn("batterytracker: failed to write tmp store file", "err", err)
 		return
 	}
