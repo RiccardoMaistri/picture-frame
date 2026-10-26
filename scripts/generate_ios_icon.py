@@ -115,17 +115,9 @@ def create_ios_icon():
     # Scale surface line-art image to canvas
     surface_scaled = surface_raw.resize((canvas_size, canvas_size), Image.Resampling.LANCZOS)
 
-    # Recolor black lines into bright silver-white lines, masking out the pen at bottom right
+    # Recolor black lines into bright silver-white lines including the Surface pen
     flat = surface_scaled.get_flattened_data() if hasattr(surface_scaled, 'get_flattened_data') else surface_scaled.getdata()
-    lines_data = []
-    for idx, pixel in enumerate(flat):
-        x = idx % canvas_size
-        y = idx // canvas_size
-        # Mask out the pen at bottom right (x > 460 and y > 760)
-        if x > 460 and y > 760:
-            lines_data.append((0, 0, 0, 0))
-        else:
-            lines_data.append((240, 245, 255, pixel[3]))
+    lines_data = [(240, 245, 255, pixel[3]) for pixel in flat]
 
     surface_lines = Image.new("RGBA", (canvas_size, canvas_size))
     surface_lines.putdata(lines_data)
@@ -170,7 +162,7 @@ def create_ios_icon():
     glare_draw.polygon([(182, 195), (500, 195), (250, 700)], fill=(255, 255, 255, 18))
     bg = Image.alpha_composite(bg, glare)
 
-    # Composite the white Surface tablet line art (kickstand, bezels; pen masked out) on top
+    # Composite the white Surface tablet line art (kickstand, pen, bezels) on top
     bg = Image.alpha_composite(bg, surface_lines)
 
     # Save output images
