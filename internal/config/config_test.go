@@ -1064,3 +1064,65 @@ func TestMinimalExampleLoads(t *testing.T) {
 		t.Errorf("minimal example does not validate: %v", err)
 	}
 }
+
+func TestValidateSuspendSchedule(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     config.SuspendScheduleConfig
+		wantErr bool
+	}{
+		{
+			name: "valid weekday and weekend",
+			cfg: config.SuspendScheduleConfig{
+				Enabled:             true,
+				WeekdaySuspendStart: "23:00",
+				WeekdaySuspendEnd:   "06:30",
+				WeekdayWakeAt:       "07:00",
+				WeekendSuspendStart: "00:00",
+				WeekendSuspendEnd:   "08:30",
+				WeekendWakeAt:       "09:00",
+			},
+			wantErr: false,
+		},
+		{
+			name: "legacy fields fallback",
+			cfg: config.SuspendScheduleConfig{
+				Enabled:      true,
+				SuspendStart: "22:00",
+				SuspendEnd:   "06:00",
+				WakeAt:       "06:30",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid time string",
+			cfg: config.SuspendScheduleConfig{
+				Enabled:             true,
+				WeekdaySuspendStart: "25:00",
+				WeekdaySuspendEnd:   "06:30",
+				WeekdayWakeAt:       "07:00",
+				WeekendSuspendStart: "23:00",
+				WeekendSuspendEnd:   "08:30",
+				WeekendWakeAt:       "09:00",
+			},
+			wantErr: true,
+		},
+		{
+			name: "disabled bypasses validation",
+			cfg: config.SuspendScheduleConfig{
+				Enabled:             false,
+				WeekdaySuspendStart: "invalid",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

@@ -224,3 +224,17 @@ See [Software updates](/manual/updates/).
 | `update_hour`  | integer | `2`     | Local hour (0–23) for the scheduled check and install.                                          |
 | `github_repo`  | string  | (empty) | Release source as `owner/name`. Empty tracks the official releases.                             |
 | `github_token` | string  | (empty) | Authenticates a private release source (the `PF_GITHUB_TOKEN` environment variable also works). |
+
+## `[suspend_schedule]`
+
+Local-time schedule for automatic overnight deep sleep (suspend and RTC alarm wake).
+
+| Key                     | Type    | Default | Description                                                     |
+| ----------------------- | ------- | ------- | --------------------------------------------------------------- |
+| `enabled`               | boolean | `true`  | Enable automatic overnight deep sleep.                          |
+| `weekday_suspend_start` | string  | `23:00` | Local time (HH:MM) to start overnight suspend on Mon–Fri.       |
+| `weekday_suspend_end`   | string  | `06:30` | Local time (HH:MM) to end suspend retries on Mon–Fri.          |
+| `weekday_wake_at`       | string  | `07:00` | Local time (HH:MM) for RTC wake alarm on Mon–Fri.              |
+| `weekend_suspend_start` | string  | `23:00` | Local time (HH:MM) to start overnight suspend on Sat–Sun.       |
+| `weekend_suspend_end`   | string  | `08:30` | Local time (HH:MM) to end suspend retries on Sat–Sun.          |
+| `weekend_wake_at`       | string  | `09:00` | Local time (HH:MM) for RTC wake alarm on Sat–Sun.              |

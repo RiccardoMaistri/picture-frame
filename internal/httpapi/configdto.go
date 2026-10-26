@@ -21,15 +21,26 @@ import (
 
 // ConfigDTO mirrors config.Config for the settings API.
 type ConfigDTO struct {
-	LogLevel         string       `json:"log_level" enum:"debug,info,warn,error" doc:"Logging verbosity; applied live"`
-	BluetoothAdapter string       `json:"bluetooth_adapter" doc:"HCI device ID, e.g. hci0"`
-	Display          DisplayDTO   `json:"display"`
-	Slideshow        SlideshowDTO `json:"slideshow"`
-	Library          LibraryDTO   `json:"library"`
-	Sensors          []SensorDTO  `json:"sensors"`
-	Weather          WeatherDTO   `json:"weather"`
-	Mqtt             MqttDTO      `json:"mqtt"`
-	Updater          UpdaterDTO   `json:"updater"`
+	LogLevel         string             `json:"log_level" enum:"debug,info,warn,error" doc:"Logging verbosity; applied live"`
+	BluetoothAdapter string             `json:"bluetooth_adapter" doc:"HCI device ID, e.g. hci0"`
+	Display          DisplayDTO         `json:"display"`
+	Slideshow        SlideshowDTO       `json:"slideshow"`
+	Library          LibraryDTO         `json:"library"`
+	Sensors          []SensorDTO        `json:"sensors"`
+	Weather          WeatherDTO         `json:"weather"`
+	Mqtt             MqttDTO            `json:"mqtt"`
+	Updater          UpdaterDTO         `json:"updater"`
+	SuspendSchedule  SuspendScheduleDTO `json:"suspend_schedule"`
+}
+
+type SuspendScheduleDTO struct {
+	Enabled             bool   `json:"enabled"`
+	WeekdaySuspendStart string `json:"weekday_suspend_start"`
+	WeekdaySuspendEnd   string `json:"weekday_suspend_end"`
+	WeekdayWakeAt       string `json:"weekday_wake_at"`
+	WeekendSuspendStart string `json:"weekend_suspend_start"`
+	WeekendSuspendEnd   string `json:"weekend_suspend_end"`
+	WeekendWakeAt       string `json:"weekend_wake_at"`
 }
 
 // UpdaterDTO mirrors config.UpdaterConfig for the settings UI.
@@ -271,6 +282,15 @@ func toDTO(cfg config.Config) ConfigDTO {
 			GithubRepo:     cfg.Updater.GithubRepo,
 			GithubTokenSet: cfg.Updater.GithubToken != "",
 		},
+		SuspendSchedule: SuspendScheduleDTO{
+			Enabled:             cfg.SuspendSchedule.Enabled,
+			WeekdaySuspendStart: cfg.SuspendSchedule.WeekdaySuspendStart,
+			WeekdaySuspendEnd:   cfg.SuspendSchedule.WeekdaySuspendEnd,
+			WeekdayWakeAt:       cfg.SuspendSchedule.WeekdayWakeAt,
+			WeekendSuspendStart: cfg.SuspendSchedule.WeekendSuspendStart,
+			WeekendSuspendEnd:   cfg.SuspendSchedule.WeekendSuspendEnd,
+			WeekendWakeAt:       cfg.SuspendSchedule.WeekendWakeAt,
+		},
 	}
 }
 
@@ -332,7 +352,18 @@ func applyDTO(dto ConfigDTO, current config.Config) (config.Config, error) {
 	if err := applyUpdaterDTO(&out.Updater, dto.Updater); err != nil {
 		return config.Config{}, err
 	}
+	applySuspendScheduleDTO(&out.SuspendSchedule, dto.SuspendSchedule)
 	return out, nil
+}
+
+func applySuspendScheduleDTO(dst *config.SuspendScheduleConfig, dto SuspendScheduleDTO) {
+	dst.Enabled = dto.Enabled
+	dst.WeekdaySuspendStart = dto.WeekdaySuspendStart
+	dst.WeekdaySuspendEnd = dto.WeekdaySuspendEnd
+	dst.WeekdayWakeAt = dto.WeekdayWakeAt
+	dst.WeekendSuspendStart = dto.WeekendSuspendStart
+	dst.WeekendSuspendEnd = dto.WeekendSuspendEnd
+	dst.WeekendWakeAt = dto.WeekendWakeAt
 }
 
 func applyUpdaterDTO(dst *config.UpdaterConfig, dto UpdaterDTO) error {

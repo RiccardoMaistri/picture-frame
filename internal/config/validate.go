@@ -61,6 +61,9 @@ func (c *Config) Validate() error {
 	if err := c.Slideshow.validate(); err != nil {
 		return fmt.Errorf("slideshow: %w", err)
 	}
+	if err := c.SuspendSchedule.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 

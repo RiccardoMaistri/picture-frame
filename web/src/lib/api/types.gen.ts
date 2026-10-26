@@ -88,6 +88,7 @@ export type ConfigDto = {
     mqtt: MqttDto;
     sensors: Array<SensorDto> | null;
     slideshow: SlideshowDto;
+    suspend_schedule: SuspendScheduleDto;
     updater: UpdaterDto;
     weather: WeatherDto;
 };
@@ -128,6 +129,7 @@ export type ConfigResponseBody = {
     restart_pending: boolean;
     sensors: Array<SensorDto> | null;
     slideshow: SlideshowDto;
+    suspend_schedule: SuspendScheduleDto;
     updater: UpdaterDto;
     weather: WeatherDto;
 };
@@ -532,6 +534,16 @@ export type SlideshowDto = {
     split_screen: boolean;
 };
 
+export type SuspendScheduleDto = {
+    enabled: boolean;
+    weekday_suspend_end: string;
+    weekday_suspend_start: string;
+    weekday_wake_at: string;
+    weekend_suspend_end: string;
+    weekend_suspend_start: string;
+    weekend_wake_at: string;
+};
+
 export type SystemDevicesBody = {
     /**
      * A URL to the JSON Schema for this object.
@@ -793,6 +805,7 @@ export type ConfigDtoWritable = {
     mqtt: MqttDto;
     sensors: Array<SensorDto> | null;
     slideshow: SlideshowDto;
+    suspend_schedule: SuspendScheduleDto;
     updater: UpdaterDto;
     weather: WeatherDto;
 };
@@ -825,6 +838,7 @@ export type ConfigResponseBodyWritable = {
     restart_pending: boolean;
     sensors: Array<SensorDto> | null;
     slideshow: SlideshowDto;
+    suspend_schedule: SuspendScheduleDto;
     updater: UpdaterDto;
     weather: WeatherDto;
 };

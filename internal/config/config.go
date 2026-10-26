@@ -29,20 +29,20 @@ type AuthConfig struct {
 
 // Config holds all runtime configuration for the application.
 type Config struct {
-	Addr             string          `toml:"addr"`
-	LogLevel         string          `toml:"log_level"`         // "debug", "info", "warn", "error"; default "info"
-	BluetoothAdapter string          `toml:"bluetooth_adapter"` // HCI device ID, e.g. "hci0" or "hci1"
-	Display          DisplayConfig   `toml:"display"`
-	Slideshow        SlideshowConfig `toml:"slideshow"`
-	Library          LibraryConfig   `toml:"library"`
-	Immich           ImmichConfig    `toml:"immich"`
-	Cache            CacheConfig     `toml:"cache"`
-	Sensors          []SensorConfig  `toml:"sensor"`
-	Weather          WeatherConfig   `toml:"weather"`
-	Mqtt             MqttConfig      `toml:"mqtt"`
-	WiFi             WiFiConfig      `toml:"wifi"`
-	Auth             AuthConfig      `toml:"auth"`
-	Updater          UpdaterConfig   `toml:"updater"`
+	Addr             string                `toml:"addr"`
+	LogLevel         string                `toml:"log_level"`         // "debug", "info", "warn", "error"; default "info"
+	BluetoothAdapter string                `toml:"bluetooth_adapter"` // HCI device ID, e.g. "hci0" or "hci1"
+	Display          DisplayConfig         `toml:"display"`
+	Slideshow        SlideshowConfig       `toml:"slideshow"`
+	Library          LibraryConfig         `toml:"library"`
+	Immich           ImmichConfig          `toml:"immich"`
+	Cache            CacheConfig           `toml:"cache"`
+	Sensors          []SensorConfig        `toml:"sensor"`
+	Weather          WeatherConfig         `toml:"weather"`
+	Mqtt             MqttConfig            `toml:"mqtt"`
+	WiFi             WiFiConfig            `toml:"wifi"`
+	Auth             AuthConfig            `toml:"auth"`
+	Updater          UpdaterConfig         `toml:"updater"`
 	SuspendSchedule  SuspendScheduleConfig `toml:"suspend_schedule"`
 }
 
@@ -199,19 +199,57 @@ type KioskLabelsConfig struct {
 
 // SuspendScheduleConfig selects suspend and wake times at local times.
 // The frame suspends at the first 30-min tick inside the window and wakes via
-// the RTC alarm at WAKE_AT. The window normally crosses midnight (e.g. 23:00-06:30).
+// the RTC alarm at wake_at.
 type SuspendScheduleConfig struct {
-	Enabled     bool   `toml:"enabled"`       // if false, no automatic suspend
-	SuspendStart string `toml:"suspend_start"` // e.g. "23:00"
-	SuspendEnd   string `toml:"suspend_end"`   // e.g. "06:30"
-	WakeAt       string `toml:"wake_at"`       // e.g. "07:00"
+	Enabled             bool   `toml:"enabled"`               // if false, no automatic suspend
+	WeekdaySuspendStart string `toml:"weekday_suspend_start"` // e.g. "23:00"
+	WeekdaySuspendEnd   string `toml:"weekday_suspend_end"`   // e.g. "06:30"
+	WeekdayWakeAt       string `toml:"weekday_wake_at"`       // e.g. "07:00"
+	WeekendSuspendStart string `toml:"weekend_suspend_start"` // e.g. "23:00"
+	WeekendSuspendEnd   string `toml:"weekend_suspend_end"`   // e.g. "08:30"
+	WeekendWakeAt       string `toml:"weekend_wake_at"`       // e.g. "09:00"
+
+	// Legacy fields for backward compatibility
+	SuspendStart string `toml:"suspend_start,omitempty"`
+	SuspendEnd   string `toml:"suspend_end,omitempty"`
+	WakeAt       string `toml:"wake_at,omitempty"`
 }
 
-func (s SuspendScheduleConfig) Validate() error {
+func (s *SuspendScheduleConfig) Validate() error {
 	if !s.Enabled {
 		return nil
 	}
-	for name, value := range map[string]string{"suspend_start": s.SuspendStart, "suspend_end": s.SuspendEnd, "wake_at": s.WakeAt} {
+	if s.WeekdaySuspendStart == "" && s.SuspendStart != "" {
+		s.WeekdaySuspendStart = s.SuspendStart
+	}
+	if s.WeekdaySuspendEnd == "" && s.SuspendEnd != "" {
+		s.WeekdaySuspendEnd = s.SuspendEnd
+	}
+	if s.WeekdayWakeAt == "" && s.WakeAt != "" {
+		s.WeekdayWakeAt = s.WakeAt
+	}
+	if s.WeekendSuspendStart == "" && s.SuspendStart != "" {
+		s.WeekendSuspendStart = s.SuspendStart
+	}
+	if s.WeekendSuspendEnd == "" && s.SuspendEnd != "" {
+		s.WeekendSuspendEnd = s.SuspendEnd
+	}
+	if s.WeekendWakeAt == "" && s.WakeAt != "" {
+		s.WeekendWakeAt = s.WakeAt
+	}
+
+	times := map[string]string{
+		"weekday_suspend_start": s.WeekdaySuspendStart,
+		"weekday_suspend_end":   s.WeekdaySuspendEnd,
+		"weekday_wake_at":       s.WeekdayWakeAt,
+		"weekend_suspend_start": s.WeekendSuspendStart,
+		"weekend_suspend_end":   s.WeekendSuspendEnd,
+		"weekend_wake_at":       s.WeekendWakeAt,
+	}
+	for name, value := range times {
+		if value == "" {
+			return fmt.Errorf("suspend_schedule.%s cannot be empty when enabled", name)
+		}
 		if _, err := time.Parse("15:04", value); err != nil {
 			return fmt.Errorf("suspend_schedule.%s must be HH:MM", name)
 		}
@@ -378,8 +416,16 @@ func defaults() Config {
 		},
 		// AutoUpdate on by default; the SameMajor gate keeps it to minor/patch.
 		Updater: UpdaterConfig{Enabled: true, AutoUpdate: true, UpdateHour: 2},
-		// Default suspend schedule: suspend at 23:00, wake at 07:00, retry until 06:30.
-		SuspendSchedule: SuspendScheduleConfig{Enabled: true, SuspendStart: "23:00", SuspendEnd: "06:30", WakeAt: "07:00"},
+		// Default suspend schedule: weekday and weekend schedules.
+		SuspendSchedule: SuspendScheduleConfig{
+			Enabled:             true,
+			WeekdaySuspendStart: "23:00",
+			WeekdaySuspendEnd:   "06:30",
+			WeekdayWakeAt:       "07:00",
+			WeekendSuspendStart: "23:00",
+			WeekendSuspendEnd:   "08:30",
+			WeekendWakeAt:       "09:00",
+		},
 	}
 }
 

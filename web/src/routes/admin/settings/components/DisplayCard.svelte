@@ -1,16 +1,20 @@
 <script lang="ts">
-	import type { DisplayDto } from '$lib/api/types.gen';
+	import type { DisplayDto, SuspendScheduleDto } from '$lib/api/types.gen';
 	import Field from './Field.svelte';
 	import DeviceCombobox from './DeviceCombobox.svelte';
 
 	let {
 		display = $bindable(),
+		suspendSchedule = $bindable(),
 		savedDisplay,
+		savedSuspendSchedule,
 		outputs,
 		rotationSupported
 	}: {
 		display: DisplayDto;
+		suspendSchedule?: SuspendScheduleDto;
 		savedDisplay: DisplayDto;
+		savedSuspendSchedule?: SuspendScheduleDto;
 		outputs: string[];
 		rotationSupported: boolean;
 	} = $props();
@@ -101,5 +105,65 @@
 		>
 			<div class="flex items-center gap-3"><input class="input" type="time" bind:value={display.brightness_schedule.night_start} /><input class="input w-20" type="number" min="0" max="100" bind:value={display.brightness_schedule.night_level} aria-label="Night brightness percentage" /><span class="text-surface-500-400 text-sm">%</span></div>
 		</Field>
+	{/if}
+	{#if suspendSchedule}
+		<Field
+			label="Scheduled deep sleep"
+			help="Suspend the system overnight to save power. Wakes via RTC alarm. Divided into weekday and weekend schedules."
+			class="md:col-span-2"
+			changed={suspendSchedule.enabled !== savedSuspendSchedule?.enabled}
+			onrevert={() => { if (savedSuspendSchedule) suspendSchedule.enabled = savedSuspendSchedule.enabled; }}
+		>
+			<label class="flex items-center gap-2 text-sm">
+				<input class="checkbox" type="checkbox" bind:checked={suspendSchedule.enabled} />
+				Enable scheduled deep sleep (overnight suspend)
+			</label>
+		</Field>
+		{#if suspendSchedule.enabled}
+			<Field
+				label="Weekday deep sleep"
+				help="Start and wake times for Mon–Fri."
+				class="md:col-span-2"
+				changed={suspendSchedule.weekday_suspend_start !== savedSuspendSchedule?.weekday_suspend_start || suspendSchedule.weekday_suspend_end !== savedSuspendSchedule?.weekday_suspend_end || suspendSchedule.weekday_wake_at !== savedSuspendSchedule?.weekday_wake_at}
+				onrevert={() => {
+					if (savedSuspendSchedule) {
+						suspendSchedule.weekday_suspend_start = savedSuspendSchedule.weekday_suspend_start;
+						suspendSchedule.weekday_suspend_end = savedSuspendSchedule.weekday_suspend_end;
+						suspendSchedule.weekday_wake_at = savedSuspendSchedule.weekday_wake_at;
+					}
+				}}
+			>
+				<div class="flex flex-wrap items-center gap-3 text-sm">
+					<span class="text-surface-500-400">Start:</span>
+					<input class="input w-32" type="time" bind:value={suspendSchedule.weekday_suspend_start} aria-label="Weekday suspend start time" />
+					<span class="text-surface-500-400">End retry:</span>
+					<input class="input w-32" type="time" bind:value={suspendSchedule.weekday_suspend_end} aria-label="Weekday suspend end time" />
+					<span class="text-surface-500-400">Wake at:</span>
+					<input class="input w-32" type="time" bind:value={suspendSchedule.weekday_wake_at} aria-label="Weekday wake time" />
+				</div>
+			</Field>
+			<Field
+				label="Weekend deep sleep"
+				help="Start and wake times for Sat–Sun."
+				class="md:col-span-2"
+				changed={suspendSchedule.weekend_suspend_start !== savedSuspendSchedule?.weekend_suspend_start || suspendSchedule.weekend_suspend_end !== savedSuspendSchedule?.weekend_suspend_end || suspendSchedule.weekend_wake_at !== savedSuspendSchedule?.weekend_wake_at}
+				onrevert={() => {
+					if (savedSuspendSchedule) {
+						suspendSchedule.weekend_suspend_start = savedSuspendSchedule.weekend_suspend_start;
+						suspendSchedule.weekend_suspend_end = savedSuspendSchedule.weekend_suspend_end;
+						suspendSchedule.weekend_wake_at = savedSuspendSchedule.weekend_wake_at;
+					}
+				}}
+			>
+				<div class="flex flex-wrap items-center gap-3 text-sm">
+					<span class="text-surface-500-400">Start:</span>
+					<input class="input w-32" type="time" bind:value={suspendSchedule.weekend_suspend_start} aria-label="Weekend suspend start time" />
+					<span class="text-surface-500-400">End retry:</span>
+					<input class="input w-32" type="time" bind:value={suspendSchedule.weekend_suspend_end} aria-label="Weekend suspend end time" />
+					<span class="text-surface-500-400">Wake at:</span>
+					<input class="input w-32" type="time" bind:value={suspendSchedule.weekend_wake_at} aria-label="Weekend wake time" />
+				</div>
+			</Field>
+		{/if}
 	{/if}
 </div>

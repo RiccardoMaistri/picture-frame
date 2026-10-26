@@ -97,7 +97,8 @@
 		draft.display.backend !== savedConfig.display.backend ||
 			draft.display.output !== savedConfig.display.output ||
 			draft.display.rotation !== savedConfig.display.rotation ||
-			!eq(draft.display.brightness_schedule, savedConfig.display.brightness_schedule)
+			!eq(draft.display.brightness_schedule, savedConfig.display.brightness_schedule) ||
+			!eq(draft.suspend_schedule, savedConfig.suspend_schedule)
 	);
 	const libraryDirty = $derived(
 		!eq(draft.library, savedConfig.library) ||
@@ -125,6 +126,7 @@
 		draft.display.output = savedConfig.display.output;
 		draft.display.rotation = savedConfig.display.rotation;
 		draft.display.brightness_schedule = $state.snapshot(savedConfig.display.brightness_schedule);
+		draft.suspend_schedule = $state.snapshot(savedConfig.suspend_schedule);
 	}
 	function revertLibrary() {
 		draft.library = $state.snapshot(savedConfig.library);
@@ -294,7 +296,9 @@
 						<div class="space-y-4 px-2 pt-0 pb-4 md:px-4">
 							<DisplayCard
 								bind:display={draft.display}
+								bind:suspendSchedule={draft.suspend_schedule}
 								savedDisplay={savedConfig.display}
+								savedSuspendSchedule={savedConfig.suspend_schedule}
 								{outputs}
 								rotationSupported={data.devices?.rotation_supported ?? true}
 							/>

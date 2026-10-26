@@ -41,7 +41,7 @@
 		<div>
 			<h2 class="text-lg font-semibold text-neutral-100">Analisi Autonomia Batteria</h2>
 			<p class="text-xs text-neutral-400">
-				Confronto scarica Surface 3 su Debian (Schermo Acceso vs Schermo Spento)
+				Confronto scarica Surface 3 su Debian (Schermo Acceso vs Schermo Spento vs Deep Sleep)
 			</p>
 		</div>
 		{#if stats}
@@ -55,8 +55,8 @@
 		{/if}
 	</div>
 
-	<!-- Side-by-side Cards -->
-	<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+	<!-- Cards Grid -->
+	<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 		<!-- Screen On Card -->
 		<div class="rounded-lg border border-neutral-800 bg-neutral-950/50 p-4">
 			<div class="mb-3 flex items-center justify-between">
@@ -132,6 +132,44 @@
 				</div>
 			{/if}
 		</div>
+
+		<!-- Deep Sleep Card -->
+		<div class="rounded-lg border border-neutral-800 bg-neutral-950/50 p-4">
+			<div class="mb-3 flex items-center justify-between">
+				<span class="text-sm font-medium text-emerald-400 flex items-center gap-1.5">
+					<span class="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
+					Deep Sleep (Sospeso)
+				</span>
+				<span class="text-xs text-neutral-400">
+					Affidabilità: <strong class="font-medium text-neutral-200">{translateConfidence(stats?.deep_sleep?.confidence)}</strong>
+				</span>
+			</div>
+
+			{#if !stats || !stats.deep_sleep?.sufficient_data}
+				<div class="py-6 text-center text-sm font-medium text-neutral-500">
+					Dati insufficienti
+				</div>
+			{:else}
+				<div class="space-y-2">
+					<div class="flex justify-between border-b border-neutral-800/60 py-1.5 text-xs">
+						<span class="text-neutral-400">Autonomia (100% → 0%):</span>
+						<span class="font-semibold text-neutral-200 tabular-nums">{formatHours(stats.deep_sleep.estimated_full_hours)}</span>
+					</div>
+					<div class="flex justify-between border-b border-neutral-800/60 py-1.5 text-xs">
+						<span class="text-neutral-400">Autonomia residua ({stats.current_pct}% → 0%):</span>
+						<span class="font-semibold text-neutral-200 tabular-nums">{formatHours(stats.deep_sleep.estimated_rem_hours)}</span>
+					</div>
+					<div class="flex justify-between border-b border-neutral-800/60 py-1.5 text-xs">
+						<span class="text-neutral-400">Scarica media:</span>
+						<span class="font-medium text-neutral-200 tabular-nums">{formatRate(stats.deep_sleep.discharge_rate_pct_hr)}</span>
+					</div>
+					<div class="flex justify-between py-1.5 text-xs">
+						<span class="text-neutral-400">Tempo totale osservato:</span>
+						<span class="font-medium text-neutral-200 tabular-nums">{formatObserved(stats.deep_sleep.observed_duration_sec)}</span>
+					</div>
+				</div>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Comparison Summary -->
@@ -157,6 +195,10 @@
 							{day.avg_rate_off_pct_hr ? `${day.avg_rate_off_pct_hr.toFixed(1)}%/h` : '—'}
 						</div>
 						<div class="text-[10px] text-neutral-400">Spento</div>
+						<div class="mt-1 text-[11px] font-medium text-emerald-400 tabular-nums">
+							{day.avg_rate_deep_sleep_pct_hr ? `${day.avg_rate_deep_sleep_pct_hr.toFixed(1)}%/h` : '—'}
+						</div>
+						<div class="text-[10px] text-neutral-400">Sleep</div>
 					</div>
 				{/each}
 			</div>

@@ -4,9 +4,13 @@
 # via the RTC alarm at WAKE_AT.
 # These values are set at install time from the Go config and can be edited
 # directly or overridden via the web UI after a restart.
-SUSPEND_START="23:00"
-SUSPEND_END="06:30"
-WAKE_AT="07:00"
+WEEKDAY_SUSPEND_START="23:00"
+WEEKDAY_SUSPEND_END="06:30"
+WEEKDAY_WAKE_AT="07:00"
+
+WEEKEND_SUSPEND_START="23:00"
+WEEKEND_SUSPEND_END="08:30"
+WEEKEND_WAKE_AT="09:00"
 
 # RTC device and rtcwake binary; defaults are correct for the Surface 3.
 RTC="/dev/rtc0"

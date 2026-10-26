@@ -53,3 +53,22 @@ func TestBatteryTrackerSamplingAndStats(t *testing.T) {
 		t.Errorf("Confidence = %s, want insufficient", stats.ScreenOn.Confidence)
 	}
 }
+
+func TestBatteryTrackerExcludesCharging(t *testing.T) {
+	dir := t.TempDir()
+	storePath := filepath.Join(dir, "battery.json")
+
+	mm := &mockMetrics{m: hostmetrics.Metrics{HasBattery: true, BatteryPct: 80, BatteryCharging: true}}
+	md := &mockDisplay{on: true}
+
+	tracker := batterytracker.New(nil, mm, md, storePath)
+	tracker.Sample(context.Background())
+
+	stats := tracker.GetStats()
+	if !stats.Charging {
+		t.Errorf("expected Charging = true")
+	}
+	if stats.ScreenOn.SufficientData {
+		t.Errorf("expected no discharge statistics when charging")
+	}
+}

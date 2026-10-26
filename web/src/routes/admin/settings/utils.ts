@@ -85,6 +85,15 @@ export function createEmptyConfig(): ConfigResponseBody {
 			github_token: '',
 			github_token_set: false
 		},
+		suspend_schedule: {
+			enabled: true,
+			weekday_suspend_start: '23:00',
+			weekday_suspend_end: '06:30',
+			weekday_wake_at: '07:00',
+			weekend_suspend_start: '23:00',
+			weekend_suspend_end: '08:30',
+			weekend_wake_at: '09:00'
+		},
 		restart_pending: false
 	};
 }
