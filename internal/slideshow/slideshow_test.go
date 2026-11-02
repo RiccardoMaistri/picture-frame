@@ -47,6 +47,22 @@ func receiveImage(t *testing.T, ch <-chan state.Event, timeout time.Duration) st
 	return names[0]
 }
 
+// assertNoImage drains pending events and fails on any image event, ignoring
+// the screen events these tests publish on the same bus.
+func assertNoImage(t *testing.T, ch <-chan state.Event) {
+	t.Helper()
+	for {
+		select {
+		case e := <-ch:
+			if e.Kind == state.KindImage {
+				t.Fatalf("expected no image advance, got %v", e)
+			}
+		default:
+			return
+		}
+	}
+}
+
 func TestRunPublishesCurrentImmediately(t *testing.T) {
 	lib := library.New([]library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}}, false)
 	ss, bus := newSlideshow(lib)
@@ -95,6 +111,65 @@ func TestRunAdvancesOnTick(t *testing.T) {
 	if name != "b.jpg" {
 		t.Errorf("expected b.jpg after tick, got %s", name)
 	}
+}
+
+func TestRunPausesWhileScreenOff(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		lib := library.New([]library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}}, false)
+		bus := state.NewBus()
+		ss := slideshow.New(testutil.NopLogger(), lib, newPlannerFor(lib, unknownRatios), bus, time.Minute)
+
+		ch, unsub := bus.Subscribe()
+		defer unsub()
+
+		// Cancel inside the bubble: t.Context() would outlive it.
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go ss.Run(ctx)
+
+		receiveImage(t, ch, time.Second) // initial "a.jpg"
+
+		bus.Publish(state.Event{Kind: state.KindScreen, Payload: state.ScreenPayload{On: false, Auto: true}})
+		time.Sleep(10 * time.Minute)
+		synctest.Wait()
+		assertNoImage(t, ch)
+
+		// Waking gives the visible slide a full dwell rather than firing at once.
+		bus.Publish(state.Event{Kind: state.KindScreen, Payload: state.ScreenPayload{On: true, Auto: true}})
+		time.Sleep(59 * time.Second)
+		synctest.Wait()
+		assertNoImage(t, ch)
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		if name := receiveImage(t, ch, time.Second); name != "b.jpg" {
+			t.Errorf("expected b.jpg after wake, got %s", name)
+		}
+	})
+}
+
+func TestRunStartsPausedWhenScreenWasAlreadyOff(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		lib := library.New([]library.Image{{Name: "a.jpg"}, {Name: "b.jpg"}}, false)
+		bus := state.NewBus()
+		bus.Publish(state.Event{Kind: state.KindScreen, Payload: state.ScreenPayload{On: false, Auto: true}})
+		ss := slideshow.New(testutil.NopLogger(), lib, newPlannerFor(lib, unknownRatios), bus, time.Minute)
+
+		ch, unsub := bus.Subscribe()
+		defer unsub()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go ss.Run(ctx)
+
+		// The first slide still reaches the kiosk so it is ready on wake.
+		if name := receiveImage(t, ch, time.Second); name != "a.jpg" {
+			t.Fatalf("expected a.jpg on startup, got %s", name)
+		}
+
+		time.Sleep(5 * time.Minute)
+		synctest.Wait()
+		assertNoImage(t, ch)
+	})
 }
 
 func TestNextAdvancesImmediately(t *testing.T) {

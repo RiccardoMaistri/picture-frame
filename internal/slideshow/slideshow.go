@@ -103,9 +103,19 @@ func (s *Slideshow) Prev() {
 
 // Run publishes the current slide immediately (so SSE clients don't wait for
 // the first tick), then advances on the interval. The ticker is paused while
-// the library is empty and resumed by an advance or a step back.
+// the library is empty or the panel is off, and resumed by an advance, a step
+// back, or the panel waking.
 func (s *Slideshow) Run(ctx context.Context) {
+	// Track panel power from the bus. Subscribe before reading the snapshot so
+	// no transition falls between the two; the snapshot's highest ID then marks
+	// the events already reflected in the seed, which the loop skips.
+	screenCh, unsub := s.bus.Subscribe()
+	defer unsub()
+	screenOn, seedID := s.screenAtStartup()
+
 	if slide := s.servable(s.planner.Current(), s.planner.Next); slide != nil {
+		// Publish even when the panel is off so the kiosk has a frame ready to
+		// show on wake; only the dwell below is gated.
 		s.publish(slide)
 	}
 
@@ -116,9 +126,22 @@ func (s *Slideshow) Run(ctx context.Context) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	// A nil channel is never ready, so leaving tickerC nil "pauses" the ticker.
+	// armed reports whether the dwell should run: there are slides to show and
+	// the panel is on. A nil tickerC is never ready in select, which pauses the
+	// dwell without disturbing the plan or the cursor.
+	armed := func() bool { return s.lib.Len() > 0 && screenOn }
+	// restart gives the next slide a full interval, unless the dwell is paused;
+	// a paused ticker stays stopped.
+	restart := func() <-chan time.Time {
+		if !armed() {
+			ticker.Stop()
+			return nil
+		}
+		return s.restartDwell(ticker)
+	}
+
 	var tickerC <-chan time.Time
-	if s.lib.Len() > 0 {
+	if armed() {
 		tickerC = ticker.C
 	} else {
 		ticker.Stop()
@@ -137,30 +160,74 @@ func (s *Slideshow) Run(ctx context.Context) {
 			ticker.Stop()
 			tickerC = nil
 		case <-s.advance:
-			tickerC = s.restartDwell(ticker)
+			tickerC = restart()
 			if slide := s.servable(s.planner.Next(), s.planner.Next); slide != nil {
 				s.publish(slide)
 			}
 		case <-s.back:
-			tickerC = s.restartDwell(ticker)
+			tickerC = restart()
 			if slide := s.servable(s.planner.Prev(), s.planner.Prev); slide != nil {
 				s.publish(slide)
 			}
 		case <-s.restart:
 			s.planner.RestartCycle()
-			s.mu.Lock()
-			interval = s.interval
-			s.mu.Unlock()
 			if slide := s.servable(s.planner.Current(), s.planner.Next); slide != nil {
-				ticker.Reset(interval)
-				tickerC = ticker.C
+				tickerC = restart()
 				s.publish(slide)
 			} else {
 				ticker.Stop()
 				tickerC = nil
 			}
+		case event, ok := <-screenCh:
+			if !ok {
+				return
+			}
+			if event.ID <= seedID {
+				continue // already folded into the startup snapshot
+			}
+			on, isScreen := screenPower(event)
+			if !isScreen || on == screenOn {
+				continue
+			}
+			screenOn = on
+			if !screenOn {
+				// Nobody can see the frame: stop decoding and fetching slides.
+				ticker.Stop()
+				tickerC = nil
+				s.log.Debug("slideshow: paused (screen off)")
+				continue
+			}
+			// Wake: give the visible slide a full dwell before advancing.
+			tickerC = restart()
+			s.log.Debug("slideshow: resumed (screen on)")
 		}
 	}
+}
+
+// screenAtStartup seeds the pause gate from the bus's retained events. It
+// subscribes before this is called, so the highest snapshot ID bounds which
+// channel events are already reflected in the result. Defaults to on when no
+// screen event has been published yet (Run starts before the policy settles).
+func (s *Slideshow) screenAtStartup() (on bool, seedID uint64) {
+	on = true
+	for _, e := range s.bus.Snapshot() {
+		if e.ID > seedID {
+			seedID = e.ID
+		}
+		if power, ok := screenPower(e); ok {
+			on = power
+		}
+	}
+	return on, seedID
+}
+
+// screenPower reports the panel's live power from a screen event.
+func screenPower(e state.Event) (on bool, ok bool) {
+	sp, ok := e.Payload.(state.ScreenPayload)
+	if !ok || e.Kind != state.KindScreen {
+		return false, false
+	}
+	return sp.On, true
 }
 
 // restartDwell gives the new slide a full interval and unpauses the ticker.
