@@ -332,6 +332,9 @@ jobs:
         if: steps.merged.outputs.release == 'true'
         run: |
           set -euo pipefail
+          # GitHub-hosted runners have no git identity; annotated tags need one.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           tag="$(scripts/next-version.sh)"
           if [ -z "$tag" ]; then
             echo "no version to tag"
